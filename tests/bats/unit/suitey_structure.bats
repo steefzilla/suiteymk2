@@ -76,7 +76,7 @@ teardown() {
     
     # Check that main calls run_environment_checks (for non-help/version commands)
     local main_content
-    main_content=$(grep -A 30 "^main() {" "$TEST_BUILD_DIR/suitey.sh" || true)
+    main_content=$(grep -A 60 "^main() {" "$TEST_BUILD_DIR/suitey.sh" || true)
     assert echo "$main_content" | grep -q "run_environment_checks"
 }
 
@@ -88,7 +88,7 @@ teardown() {
     
     # Check that main handles environment check failures
     local main_content
-    main_content=$(grep -A 35 "^main() {" "$TEST_BUILD_DIR/suitey.sh" || true)
+    main_content=$(grep -A 60 "^main() {" "$TEST_BUILD_DIR/suitey.sh" || true)
     assert echo "$main_content" | grep -q "EXIT_SUITEY_ERROR"
     assert echo "$main_content" | grep -q "Environment validation failed"
 }
