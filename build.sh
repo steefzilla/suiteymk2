@@ -145,6 +145,137 @@ validate_output_file() {
     fi
 }
 
+# Discover all source files in src/ directory
+discover_source_files() {
+    if [[ ! -d "src" ]]; then
+        error "src/ directory not found"
+    fi
+
+    # Find all .sh files in src/ directory, sorted for consistency
+    # Exclude hidden files and directories
+    find "src" -name "*.sh" -type f -not -path "*/.*" | sort
+}
+
+# Discover all module files in mod/ directory
+discover_modules() {
+    if [[ ! -d "mod" ]]; then
+        log "Warning: mod/ directory not found - no modules to include"
+        return 0
+    fi
+
+    # Find all .sh files in mod/ directory recursively
+    # Exclude hidden files and directories
+    find "mod" -name "*.sh" -type f -not -path "*/.*" 2>/dev/null | sort
+}
+
+# Validate that discovered source files exist and are readable
+validate_source_files() {
+    local files=("$@")
+
+    if [[ ${#files[@]} -eq 0 ]]; then
+        log "Warning: No source files to validate"
+        return 0
+    fi
+
+    log "Validating ${#files[@]} source file(s)..."
+
+    for file in "${files[@]}"; do
+        if [[ -z "$file" ]]; then
+            error "Empty filename encountered during validation"
+        fi
+
+        if [[ ! -e "$file" ]]; then
+            error "Source file does not exist: $file"
+        fi
+
+        if [[ ! -f "$file" ]]; then
+            error "Path exists but is not a regular file: $file"
+        fi
+
+        if [[ ! -r "$file" ]]; then
+            error "Source file is not readable: $file"
+        fi
+
+        # Check file size (basic sanity check)
+        local file_size
+        file_size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null || echo "0")
+        if [[ $file_size -eq 0 ]]; then
+            log "Warning: Source file appears to be empty: $file"
+        fi
+    done
+
+    log "All source files validated successfully"
+}
+
+# Get build order for source files (basic dependency analysis)
+# Orders files based on simple heuristics - can be extended for full dependency analysis
+get_build_order() {
+    local source_files=("$@")
+
+    if [[ ${#source_files[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    log "Determining build order for ${#source_files[@]} file(s)..."
+
+    # Simple ordering: environment files first, then others
+    # This is a basic implementation - full dependency analysis would be more complex
+    local ordered_files=()
+    local env_files=()
+    local other_files=()
+
+    for file in "${source_files[@]}"; do
+        if [[ "$file" == *"environment"* ]]; then
+            env_files+=("$file")
+        else
+            other_files+=("$file")
+        fi
+    done
+
+    # Environment files first, then others
+    ordered_files=("${env_files[@]}" "${other_files[@]}")
+
+    log "Build order determined: ${#ordered_files[@]} file(s) ready for inclusion"
+
+    # Output the ordered files
+    printf '%s\n' "${ordered_files[@]}"
+}
+
+# Integration function that combines all source discovery
+source_discovery_integration() {
+    log "Discovering source files..."
+
+    # Discover source files
+    local source_files
+    source_files=$(discover_source_files)
+
+    # Discover modules
+    local module_files
+    module_files=$(discover_modules)
+
+    # Combine all files (filter out empty lines)
+    local all_files=()
+    while IFS= read -r file; do
+        [[ -n "$file" ]] && all_files+=("$file")
+    done <<< "$source_files"
+
+    while IFS= read -r file; do
+        [[ -n "$file" ]] && all_files+=("$file")
+    done <<< "$module_files"
+
+    # Validate files exist (only if we have files)
+    if [[ ${#all_files[@]} -gt 0 ]]; then
+        validate_source_files "${all_files[@]}"
+    fi
+
+    # Get build order
+    local ordered_files
+    ordered_files=$(get_build_order "${all_files[@]}")
+
+    # Output the files (one per line)
+    printf '%s\n' "${ordered_files[@]}"
+}
+
 # Parse command line arguments
 main() {
     local output_file="$DEFAULT_OUTPUT"
@@ -189,5 +320,8 @@ main() {
     build_suitey "$output_file"
 }
 
-# Run the main function with all arguments
-main "$@"
+# Run the main function with all arguments only when executed directly
+# (not when sourced for testing)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

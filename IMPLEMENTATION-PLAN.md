@@ -70,18 +70,18 @@ For each component:
 - [x] **Refactor**: Improve script structure, add error handling
 
 **0.2.2 Source File Discovery**
-- [ ] **Red**: Write tests for source file discovery
+- [x] **Red**: Write tests for source file discovery
   - Test: Build script can list all source files in `src/`
   - Test: Build script can list all modules in `mod/`
   - Test: Build script validates required files exist
   - Test: Build script handles missing files gracefully
   - Test: Build script respects dependency order (dependencies first)
-- [ ] **Green**: Implement source file discovery logic
+- [x] **Green**: Implement source file discovery logic
   - Scan `src/` directory for `.sh` files
   - Scan `mod/` directory for modules (recursively)
   - Validate file existence
   - Determine dependency order (if dependency tracking exists)
-- [ ] **Refactor**: Optimize file discovery, add dependency analysis
+- [x] **Refactor**: Optimize file discovery, add dependency analysis
 
 **0.2.3 Script Bundling**
 - [ ] **Red**: Write tests for script bundling
