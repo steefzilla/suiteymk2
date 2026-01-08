@@ -250,7 +250,7 @@ For each component:
 
 **0.3.6 Directory Argument Handling**
 *Accept directory path as argument (e.g., suitey.sh .) and validate it exists and is readable before execution.*
-- [ ] **Red**: Write tests for directory argument handling
+- [x] **Red**: Write tests for directory argument handling
   - Test: `./suitey.sh` (no args) shows help text
   - Test: `./suitey.sh .` accepts current directory as argument
   - Test: `./suitey.sh /path/to/dir` accepts absolute directory path
@@ -260,13 +260,13 @@ For each component:
   - Test: `./suitey.sh nonexistent-dir` exits with error code 2
   - Test: `./suitey.sh /nonexistent/path` exits with error code 2
   - Test: Directory argument is validated (exists, is readable)
-- [ ] **Green**: Implement directory argument handling in main script
+- [x] **Green**: Implement directory argument handling in main script
   - Parse directory argument (non-option argument)
   - Validate directory exists and is readable
   - Store directory path for future use (workflow execution)
   - Options (`--help`, `--version`) take precedence over directory argument
   - Show appropriate error messages for invalid directories
-- [ ] **Refactor**: Improve argument parsing, add directory normalization (resolve relative paths)
+- [x] **Refactor**: Improve argument parsing, add directory normalization (resolve relative paths)
 
 **Acceptance Criteria**:
 - `suitey.sh` exists after build (created by `build.sh`)
