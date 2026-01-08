@@ -115,17 +115,17 @@ For each component:
 - [x] **Refactor**: Improve validation, add more comprehensive checks
 
 **0.2.5 Build Artifacts Management**
-- [ ] **Red**: Write tests for build artifacts
+- [x] **Red**: Write tests for build artifacts
   - Test: Build creates output `suitey.sh` in project root (or specified location)
   - Test: Build cleans up temporary files in `/tmp`
   - Test: Build can specify output directory
   - Test: Build can specify output filename
   - Test: Build respects filesystem isolation (only writes to project root and `/tmp`)
-- [ ] **Green**: Implement artifact management
+- [x] **Green**: Implement artifact management
   - Generate output filename (with optional version/timestamp)
   - Clean up temporary files in `/tmp`
   - Support custom output paths
-- [ ] **Refactor**: Improve artifact management, add versioning support
+- [x] **Refactor**: Improve artifact management, add versioning support
 
 **0.2.6 Build Options and Flags**
 - [ ] **Red**: Write tests for build options

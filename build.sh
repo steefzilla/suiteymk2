@@ -422,6 +422,114 @@ validate_build_output() {
     log "Validated: syntax, executability, size, functions, execution, isolation"
 }
 
+# Clean up build artifacts and temporary files
+cleanup_build_artifacts() {
+    log "Cleaning up build artifacts..."
+
+    # Clean up suitey temp files in /tmp (but be careful not to remove system files)
+    local temp_files
+    temp_files=$(find /tmp -maxdepth 1 -name "suitey_*" -type f 2>/dev/null || true)
+
+    local cleaned_count=0
+    if [[ -n "$temp_files" ]]; then
+        while IFS= read -r temp_file || [[ -n "$temp_file" ]]; do
+            if [[ -n "$temp_file" && -f "$temp_file" ]]; then
+                log "Removing temporary file: $temp_file"
+                if rm -f "$temp_file" 2>/dev/null; then
+                    cleaned_count=$((cleaned_count + 1))
+                fi
+            fi
+        done <<< "$temp_files"
+    fi
+
+    if [[ $cleaned_count -gt 0 ]]; then
+        log "Cleaned up $cleaned_count temporary files"
+    else
+        log "No temporary files to clean up"
+    fi
+
+    # Also clean up any temporary directories created during build
+    local temp_dirs
+    temp_dirs=$(find /tmp -maxdepth 1 -name "suitey_*" -type d 2>/dev/null || true)
+
+    if [[ -n "$temp_dirs" ]]; then
+        while IFS= read -r temp_dir || [[ -n "$temp_dir" ]]; do
+            if [[ -n "$temp_dir" && -d "$temp_dir" ]]; then
+                # Only remove empty directories to be safe
+                # Use || true to prevent set -e from exiting on find failure
+                local dir_contents
+                dir_contents=$(find "$temp_dir" -mindepth 1 -maxdepth 1 2>/dev/null || true)
+                if [[ -z "$dir_contents" ]]; then
+                    log "Removing empty temporary directory: $temp_dir"
+                    rmdir "$temp_dir" 2>/dev/null || true
+                fi
+            fi
+        done <<< "$temp_dirs"
+    fi
+
+    # Note: We don't clean up the final output file as that's the intended artifact
+    # We also don't clean up the build directory itself as it may contain other artifacts
+
+    log "Build artifact cleanup completed"
+    return 0
+}
+
+# Generate artifact filename with optional versioning
+generate_artifact_filename() {
+    local base_name="${1:-suitey}"
+    local version="$SCRIPT_VERSION"
+    local timestamp=""
+    local extension="sh"
+
+    # Generate timestamp if requested (could be added as a flag later)
+    # timestamp="$(date +%Y%m%d_%H%M%S)_"
+
+    echo "${base_name}.${extension}"
+}
+
+# Validate and normalize output path
+normalize_output_path() {
+    local output_path="$1"
+
+    # If no path specified, use default
+    if [[ -z "$output_path" ]]; then
+        output_path="$DEFAULT_OUTPUT"
+    fi
+
+    # Convert relative paths to absolute
+    if [[ "$output_path" != /* ]]; then
+        output_path="$(pwd)/$output_path"
+    fi
+
+    # Remove any trailing slashes from directory paths
+    if [[ "$output_path" == */ ]]; then
+        output_path="${output_path%/}"
+    fi
+
+    echo "$output_path"
+}
+
+# Ensure output directory exists
+ensure_output_directory() {
+    local output_file="$1"
+    local output_dir="$(dirname "$output_file")"
+
+    # Handle the case where output_file has no directory component
+    if [[ "$output_file" == "$output_dir" ]]; then
+        output_dir="."
+    fi
+
+    if [[ ! -d "$output_dir" ]]; then
+        log "Creating output directory: $output_dir"
+        mkdir -p "$output_dir" || error "Failed to create output directory: $output_dir"
+    fi
+
+    # Verify the directory is writable
+    if [[ ! -w "$output_dir" ]]; then
+        error "Output directory is not writable: $output_dir"
+    fi
+}
+
 # Main bundling function that orchestrates the entire process
 bundle_source_files() {
     local output_file="$1"
@@ -496,11 +604,20 @@ main() {
         esac
     done
 
+    # Normalize and validate the output path
+    output_file=$(normalize_output_path "$output_file")
+
+    # Ensure output directory exists
+    ensure_output_directory "$output_file"
+
     # Validate the output file
     validate_output_file "$output_file"
 
     # Perform the build
     build_suitey "$output_file"
+
+    # Clean up artifacts
+    cleanup_build_artifacts
 }
 
 # Run the main function with all arguments only when executed directly
