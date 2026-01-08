@@ -294,3 +294,247 @@ test_suites_count=2"
     assert_output "unit_tests
 integration_tests"
 }
+
+# Data Modification Tests
+
+@test "data_set() sets new key-value pair" {
+    local data="name=suitey
+version=0.1.0"
+
+    run data_set "$data" "framework" "bats"
+    assert_success
+    
+    # Verify the new key-value pair was added
+    local result
+    result=$(data_set "$data" "framework" "bats")
+    assert echo "$result" | grep -q "framework=bats"
+    
+    # Verify existing keys are still present
+    assert echo "$result" | grep -q "name=suitey"
+    assert echo "$result" | grep -q "version=0.1.0"
+}
+
+@test "data_set() updates existing key-value pair" {
+    local data="name=suitey
+version=0.1.0"
+
+    run data_set "$data" "name" "updated_name"
+    assert_success
+    
+    local result
+    result=$(data_set "$data" "name" "updated_name")
+    
+    # Verify the key was updated (should only appear once)
+    local count
+    count=$(echo "$result" | grep -c "^name=" || true)
+    assert_equal "$count" 1
+    assert echo "$result" | grep -q "name=updated_name"
+    
+    # Verify old value is gone
+    run grep -q "name=suitey" <<< "$result"
+    assert_failure
+}
+
+@test "data_set() handles empty key (exit code 1)" {
+    local data="name=suitey"
+
+    run data_set "$data" "" "value"
+    assert_failure
+    assert_equal "$status" 1
+}
+
+@test "data_set() escapes values with special characters" {
+    local data="name=suitey"
+
+    # Test value with spaces (should be quoted)
+    local result
+    result=$(data_set "$data" "description" "My Test Suite")
+    # Value with spaces should be quoted
+    assert echo "$result" | grep -q "description="
+    # Verify we can retrieve the value correctly
+    run data_get "$result" "description"
+    assert_success
+    assert_output "My Test Suite"
+
+    # Test value with quotes (should be escaped/quoted)
+    # Note: The input "echo \"hello\"" is a string literal containing backslash+quote
+    result=$(data_set "$data" "command" "echo \"hello\"")
+    # The value should be properly escaped
+    assert echo "$result" | grep -q "command="
+    # Verify we can retrieve the value correctly (backslash+quote preserved)
+    # The stored value is "echo \"hello\"" which contains literal backslash+quote
+    run data_get "$result" "command"
+    assert_success
+    # Match the literal backslash and quote characters
+    assert_output 'echo \"hello\"'
+}
+
+@test "data_set() handles empty value" {
+    local data="name=suitey"
+
+    run data_set "$data" "empty_key" ""
+    assert_success
+    
+    local result
+    result=$(data_set "$data" "empty_key" "")
+    assert echo "$result" | grep -q "empty_key="
+    
+    # Verify we can retrieve the empty value
+    run data_get "$result" "empty_key"
+    assert_success
+    assert_output ""
+}
+
+@test "data_array_append() appends to array" {
+    local data="test_files_0=/path/to/test1.bats
+test_files_count=1"
+
+    local result
+    result=$(data_array_append "$data" "test_files" "/path/to/test2.bats")
+    
+    # Verify new element was added
+    run data_get_array "$result" "test_files" 1
+    assert_success
+    assert_output "/path/to/test2.bats"
+    
+    # Verify count was updated
+    run data_array_count "$result" "test_files"
+    assert_success
+    assert_output "2"
+    
+    # Verify original element still exists
+    run data_get_array "$result" "test_files" 0
+    assert_success
+    assert_output "/path/to/test1.bats"
+}
+
+@test "data_array_append() creates array if it doesn't exist" {
+    local data="other_key=value"
+
+    local result
+    result=$(data_array_append "$data" "test_files" "/path/to/test1.bats")
+    
+    # Verify element was added at index 0
+    run data_get_array "$result" "test_files" 0
+    assert_success
+    assert_output "/path/to/test1.bats"
+    
+    # Verify count was set to 1
+    run data_array_count "$result" "test_files"
+    assert_success
+    assert_output "1"
+}
+
+@test "data_array_append() handles empty value" {
+    local data="test_files_0=/path/to/test1.bats
+test_files_count=1"
+
+    local result
+    result=$(data_array_append "$data" "test_files" "")
+    
+    # Verify empty element was added
+    run data_get_array "$result" "test_files" 1
+    assert_success
+    assert_output ""
+    
+    # Verify count was updated
+    run data_array_count "$result" "test_files"
+    assert_success
+    assert_output "2"
+}
+
+@test "data_set_array() replaces entire array" {
+    local data="test_files_0=/path/to/old1.bats
+test_files_1=/path/to/old2.bats
+test_files_count=2
+other_key=value"
+
+    local result
+    result=$(data_set_array "$data" "test_files" "/path/to/new1.bats" "/path/to/new2.bats" "/path/to/new3.bats")
+    
+    # Verify old elements are gone
+    run grep -q "test_files_0=/path/to/old1.bats" <<< "$result"
+    assert_failure
+    
+    run grep -q "test_files_1=/path/to/old2.bats" <<< "$result"
+    assert_failure
+    
+    # Verify new elements exist
+    run data_get_array "$result" "test_files" 0
+    assert_success
+    assert_output "/path/to/new1.bats"
+    
+    run data_get_array "$result" "test_files" 1
+    assert_success
+    assert_output "/path/to/new2.bats"
+    
+    run data_get_array "$result" "test_files" 2
+    assert_success
+    assert_output "/path/to/new3.bats"
+    
+    # Verify count was updated
+    run data_array_count "$result" "test_files"
+    assert_success
+    assert_output "3"
+    
+    # Verify other keys are preserved
+    assert echo "$result" | grep -q "other_key=value"
+}
+
+@test "data_set_array() creates array if it doesn't exist" {
+    local data="other_key=value"
+
+    local result
+    result=$(data_set_array "$data" "test_files" "/path/to/test1.bats" "/path/to/test2.bats")
+    
+    # Verify elements were added
+    run data_get_array "$result" "test_files" 0
+    assert_success
+    assert_output "/path/to/test1.bats"
+    
+    run data_get_array "$result" "test_files" 1
+    assert_success
+    assert_output "/path/to/test2.bats"
+    
+    # Verify count was set
+    run data_array_count "$result" "test_files"
+    assert_success
+    assert_output "2"
+}
+
+@test "data_set_array() handles empty array (removes all elements)" {
+    local data="test_files_0=/path/to/test1.bats
+test_files_count=1"
+
+    local result
+    result=$(data_set_array "$data" "test_files")
+    
+    # Verify all elements are gone
+    run grep -q "test_files_0=" <<< "$result"
+    assert_failure
+    
+    # Verify count is 0
+    run data_array_count "$result" "test_files"
+    assert_success
+    assert_output "0"
+}
+
+@test "data_set_array() handles multiple values correctly" {
+    local data=""
+
+    local result
+    result=$(data_set_array "$data" "suites" "unit" "integration" "e2e" "performance")
+    
+    # Verify all elements exist
+    run data_get_array_all "$result" "suites"
+    assert_success
+    assert_output "unit
+integration
+e2e
+performance"
+    
+    # Verify count is correct
+    run data_array_count "$result" "suites"
+    assert_success
+    assert_output "4"
+}

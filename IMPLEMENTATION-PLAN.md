@@ -322,13 +322,13 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **1.1.3 Data Modification**
 *Implement functions to set key-value pairs, append to arrays, and replace entire arrays in data strings.*
-- [ ] **Red**: Write tests for `data_set()`, `data_array_append()`, `data_set_array()`
+- [x] **Red**: Write tests for `data_set()`, `data_array_append()`, `data_set_array()`
   - Test: Set new key-value pair
   - Test: Update existing key-value pair
   - Test: Append to array
   - Test: Replace entire array
-- [ ] **Green**: Implement data modification functions
-- [ ] **Refactor**: Optimize string manipulation, handle edge cases
+- [x] **Green**: Implement data modification functions
+- [x] **Refactor**: Optimize string manipulation, handle edge cases
 
 **1.1.4 Multi-line Support**
 *Implement functions to store and retrieve multi-line values using heredoc syntax in data strings.*
