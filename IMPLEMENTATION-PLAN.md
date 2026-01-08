@@ -225,14 +225,14 @@ For each component:
 - [x] **Refactor**: Organize script layout, add comments, improve error handling
 
 **0.3.5 Basic Script Running**
-- [ ] **Red**: Write integration test `tests/bats/integration/suitey_basic.bats`
+- [x] **Red**: Write integration test `tests/bats/integration/suitey_basic.bats`
   - Test: `./suitey.sh --help` runs successfully (exit code 0)
   - Test: `./suitey.sh -h` runs successfully (exit code 0)
   - Test: Script shows help text when run without arguments
   - Test: Script validates environment before execution
   - Test: Script respects filesystem isolation (only reads project, writes to `/tmp`)
-- [ ] **Green**: Ensure script runs correctly end-to-end
-- [ ] **Refactor**: Optimize script execution, improve user experience
+- [x] **Green**: Ensure script runs correctly end-to-end
+- [x] **Refactor**: Optimize script execution, improve user experience
 
 **0.3.6 Directory Argument Handling**
 - [ ] **Red**: Write tests for directory argument handling
