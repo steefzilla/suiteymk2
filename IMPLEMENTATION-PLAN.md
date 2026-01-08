@@ -57,17 +57,17 @@ For each component:
 #### TDD Steps:
 
 **0.2.1 Build Script Creation**
-- [ ] **Red**: Write test `tests/bats/unit/build_script.bats` for build script
+- [x] **Red**: Write test `tests/bats/unit/build_script.bats` for build script
   - Test: `build.sh` file exists
   - Test: `build.sh` is executable
   - Test: Build script has shebang (`#!/usr/bin/env bash`)
   - Test: Running `./build.sh --help` shows help text
-  - Test: Running `./build.sh` without args shows usage
-- [ ] **Green**: Create `build.sh` with basic structure
+  - Test: Running `./build.sh` without args builds suitey.sh
+- [x] **Green**: Create `build.sh` with basic structure
   - Add shebang
   - Add help/usage functions
   - Make executable
-- [ ] **Refactor**: Improve script structure, add error handling
+- [x] **Refactor**: Improve script structure, add error handling
 
 **0.2.2 Source File Discovery**
 - [ ] **Red**: Write tests for source file discovery
@@ -158,6 +158,7 @@ For each component:
 - Built `suitey.sh` is valid Bash and runs correctly
 - Build process is documented
 - Build respects filesystem isolation (only project root and `/tmp`)
+- Comprehensive unit and integration tests prevent regression
 
 ---
 
