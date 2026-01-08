@@ -303,12 +303,12 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **1.1.1 Basic Key-Value Access**
 *Implement data_get() function to extract values from key=value format data strings.*
-- [ ] **Red**: Write test `tests/bats/unit/data_access.bats` for `data_get()`
+- [x] **Red**: Write test `tests/bats/unit/data_access.bats` for `data_get()`
   - Test: Extract simple value from `key=value` format
   - Test: Return empty string for missing key
   - Test: Handle empty input (exit code 1)
-- [ ] **Green**: Implement `data_get()` in `src/data_access.sh`
-- [ ] **Refactor**: Optimize string parsing, add error handling
+- [x] **Green**: Implement `data_get()` in `src/data_access.sh`
+- [x] **Refactor**: Optimize string parsing, add error handling
 
 **1.1.2 Array Access**
 *Implement functions to access array elements by index, get array count, and retrieve all array elements.*
