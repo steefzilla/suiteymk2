@@ -312,13 +312,13 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **1.1.2 Array Access**
 *Implement functions to access array elements by index, get array count, and retrieve all array elements.*
-- [ ] **Red**: Write tests for `data_get_array()`, `data_array_count()`, `data_get_array_all()`
+- [x] **Red**: Write tests for `data_get_array()`, `data_array_count()`, `data_get_array_all()`
   - Test: Extract array element by index
   - Test: Get array count
   - Test: Get all array elements
   - Test: Handle missing arrays (return empty/0)
-- [ ] **Green**: Implement array access functions
-- [ ] **Refactor**: Consolidate array logic, improve validation
+- [x] **Green**: Implement array access functions
+- [x] **Refactor**: Consolidate array logic, improve validation
 
 **1.1.3 Data Modification**
 *Implement functions to set key-value pairs, append to arrays, and replace entire arrays in data strings.*
