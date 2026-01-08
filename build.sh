@@ -316,15 +316,60 @@ create_bundle_footer() {
     cat >> "$output_file" << 'EOF'
 # Main Suitey functionality will be added here
 
-main() {
+show_help() {
+    cat << 'HELP_EOF'
+Suitey v0.1.0 - Cross-platform test runner
+
+Usage: suitey.sh [OPTIONS] [COMMAND]
+
+DESCRIPTION
+    Suitey is a cross-platform test runner that automatically detects test suites,
+    builds projects, and executes tests in isolated Docker containers.
+
+OPTIONS
+    -h, --help          Show this help message and exit
+    -v, --version       Show version information and exit
+
+COMMANDS
+    (Commands will be implemented in future phases)
+
+EXAMPLES
+    suitey.sh --help          Show help information
+    suitey.sh --version       Show version information
+    suitey.sh                 Show help (default behavior)
+
+For more information, see the Suitey documentation.
+HELP_EOF
+}
+
+show_version() {
     echo "Suitey v0.1.0"
     echo "Build system functional - ready for implementation"
-    echo ""
-    echo "Usage: $0 [command] [options]"
-    echo ""
-    echo "Commands:"
-    echo "  --help, -h    Show help"
-    echo "  --version, -v Show version"
+}
+
+main() {
+    # Parse command-line arguments
+    if [[ $# -eq 0 ]]; then
+        # No arguments provided, show help
+        show_help
+        exit 0
+    fi
+
+    case "$1" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -v|--version)
+            show_version
+            exit 0
+            ;;
+        *)
+            echo "Error: Unknown option '$1'" >&2
+            echo "Run '$0 --help' for usage information." >&2
+            exit 2
+            ;;
+    esac
 }
 
 # Run main function

@@ -182,7 +182,7 @@ For each component:
 - [x] **Refactor**: Ensure proper permissions, shebang correctness
 
 **0.3.2 Help Text Display**
-- [ ] **Red**: Write tests for help functionality
+- [x] **Red**: Write tests for help functionality
   - Test: Running `./suitey.sh --help` exits with code 0
   - Test: Running `./suitey.sh -h` exits with code 0
   - Test: Help text contains "Suitey" in output
@@ -190,12 +190,12 @@ For each component:
   - Test: Help text contains available options
   - Test: Running `./suitey.sh` (no args) shows help text
   - Test: Help text includes version information (if available)
-- [ ] **Green**: Implement help text display in `suitey.sh` (via build system)
+- [x] **Green**: Implement help text display in `suitey.sh` (via build system)
   - Add `--help` and `-h` option handling to main script
   - Display usage information
   - Exit with code 0
   - Source `src/environment.sh` for environment checks
-- [ ] **Refactor**: Improve help text formatting, add more details
+- [x] **Refactor**: Improve help text formatting, add more details
 
 **0.3.3 Basic Exit Codes**
 - [ ] **Red**: Write tests for exit codes
