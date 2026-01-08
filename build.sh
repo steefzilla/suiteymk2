@@ -316,6 +316,14 @@ create_bundle_footer() {
     cat >> "$output_file" << 'EOF'
 # Main Suitey functionality will be added here
 
+# Exit code constants
+# 0 = success
+# 1 = tests failed (for future use)
+# 2 = suitey error (invalid arguments, internal errors, etc.)
+readonly EXIT_SUCCESS=0
+readonly EXIT_TESTS_FAILED=1
+readonly EXIT_SUITEY_ERROR=2
+
 show_help() {
     cat << 'HELP_EOF'
 Suitey v0.1.0 - Cross-platform test runner
@@ -352,22 +360,22 @@ main() {
     if [[ $# -eq 0 ]]; then
         # No arguments provided, show help
         show_help
-        exit 0
+        exit $EXIT_SUCCESS
     fi
 
     case "$1" in
         -h|--help)
             show_help
-            exit 0
+            exit $EXIT_SUCCESS
             ;;
         -v|--version)
             show_version
-            exit 0
+            exit $EXIT_SUCCESS
             ;;
         *)
             echo "Error: Unknown option '$1'" >&2
             echo "Run '$0 --help' for usage information." >&2
-            exit 2
+            exit $EXIT_SUITEY_ERROR
             ;;
     esac
 }

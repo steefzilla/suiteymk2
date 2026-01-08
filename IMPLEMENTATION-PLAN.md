@@ -198,17 +198,17 @@ For each component:
 - [x] **Refactor**: Improve help text formatting, add more details
 
 **0.3.3 Basic Exit Codes**
-- [ ] **Red**: Write tests for exit codes
+- [x] **Red**: Write tests for exit codes
   - Test: `./suitey.sh --help` exits with code 0
   - Test: `./suitey.sh -h` exits with code 0
   - Test: `./suitey.sh --invalid-option` exits with code 2 (invalid argument)
   - Test: Script handles errors gracefully
   - Test: Script exits with code 0 when showing help
-- [ ] **Green**: Implement exit code logic in main script
+- [x] **Green**: Implement exit code logic in main script
   - Define exit code constants (0=success, 1=tests failed, 2=suitey error)
   - Handle help options (exit 0)
   - Handle invalid options (exit 2)
-- [ ] **Refactor**: Ensure consistent exit code usage
+- [x] **Refactor**: Ensure consistent exit code usage
 
 **0.3.4 Script Structure and Environment Integration**
 - [ ] **Red**: Write tests for script structure
