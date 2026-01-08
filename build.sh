@@ -11,6 +11,12 @@ SCRIPT_VERSION="0.1.0"
 # Default output file
 DEFAULT_OUTPUT="suitey.sh"
 
+# Build options
+VERBOSE_MODE=false
+CLEAN_MODE=false
+BUNDLE_VERSION="$SCRIPT_VERSION"
+OUTPUT_NAME=""
+
 # Function to display usage information
 show_usage() {
     cat << EOF
@@ -24,10 +30,18 @@ OPTIONS:
     -h, --help          Show this help message and exit
     -v, --version       Show version information and exit
     --output FILE       Specify output file (default: ${DEFAULT_OUTPUT})
+    --name NAME         Set output name (used with default output location)
+    --version VER       Set version to include in bundle (default: ${SCRIPT_VERSION})
+    --clean             Clean output file before building
+    --verbose           Show detailed build output
 
 EXAMPLES:
     $0                          # Build with default settings
     $0 --output my-suitey.sh    # Build with custom output file
+    $0 --name myapp             # Build with custom name (creates myapp.sh)
+    $0 --version 2.0.0          # Build with version 2.0.0 in bundle
+    $0 --clean                  # Clean existing output before building
+    $0 --verbose                # Show detailed build progress
     $0 --help                   # Show this help message
 
 EOF
@@ -38,9 +52,16 @@ show_version() {
     echo "Suitey Build Script v${SCRIPT_VERSION}"
 }
 
-# Function to log messages
+# Function to log messages (always shown)
 log() {
     echo "[BUILD] $1" >&2
+}
+
+# Function to log verbose messages (only shown with --verbose)
+vlog() {
+    if [[ "$VERBOSE_MODE" == "true" ]]; then
+        echo "[BUILD] $1" >&2
+    fi
 }
 
 # Function to show error and exit
@@ -134,7 +155,7 @@ validate_source_files() {
         return 0
     fi
 
-    log "Validating ${#files[@]} source file(s)..."
+    vlog "Validating ${#files[@]} source file(s)..."
 
     for file in "${files[@]}"; do
         if [[ -z "$file" ]]; then
@@ -173,7 +194,7 @@ get_build_order() {
         return 0
     fi
 
-    log "Determining build order for ${#source_files[@]} file(s)..."
+    vlog "Determining build order for ${#source_files[@]} file(s)..."
 
     # Simple ordering: environment files first, then others
     # This is a basic implementation - full dependency analysis would be more complex
@@ -247,7 +268,7 @@ create_bundle_header() {
 EOF
 
     # Add version information
-    echo "# Version: ${SCRIPT_VERSION}" >> "$output_file"
+    echo "# Version: ${BUNDLE_VERSION}" >> "$output_file"
     echo "# Built: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> "$output_file"
     echo "# Built on: $(uname -s) $(uname -r)" >> "$output_file"
     echo >> "$output_file"
@@ -268,7 +289,7 @@ include_source_files() {
 
     for source_file in "${source_files[@]}"; do
         if [[ -f "$source_file" ]]; then
-            log "Including: $source_file"
+            vlog "Including: $source_file"
 
             # Add a comment header for the file
             echo "# Included from: $source_file" >> "$output_file"
@@ -549,7 +570,7 @@ bundle_source_files() {
     if [[ ${#source_files_array[@]} -eq 0 ]]; then
         log "Warning: No source files found to bundle"
     else
-        log "Found ${#source_files_array[@]} file(s) to bundle"
+        vlog "Found ${#source_files_array[@]} file(s) to bundle"
     fi
 
     # Create bundle header
@@ -567,6 +588,19 @@ bundle_source_files() {
     log "Script bundling completed successfully"
 }
 
+# Clean output file before building
+clean_output_file() {
+    local output_file="$1"
+
+    if [[ -f "$output_file" ]]; then
+        log "Cleaning existing output file: $output_file"
+        rm -f "$output_file" || error "Failed to remove existing output file: $output_file"
+        vlog "Removed existing file: $output_file"
+    else
+        vlog "No existing file to clean: $output_file"
+    fi
+}
+
 # Parse command line arguments
 main() {
     local output_file="$DEFAULT_OUTPUT"
@@ -577,9 +611,21 @@ main() {
                 show_usage
                 exit 0
                 ;;
-            -v|--version)
+            -v)
                 show_version
                 exit 0
+                ;;
+            --version)
+                # Check if this is --version with argument (set bundle version) or without (show version)
+                if [[ $# -ge 2 && ! "$2" =~ ^- ]]; then
+                    # --version with argument: set bundle version
+                    BUNDLE_VERSION="$2"
+                    shift 2
+                else
+                    # --version without argument: show version and exit
+                    show_version
+                    exit 0
+                fi
                 ;;
             --output)
                 if [[ $# -lt 2 ]]; then
@@ -598,17 +644,60 @@ main() {
                 fi
                 shift
                 ;;
+            --name)
+                if [[ $# -lt 2 ]]; then
+                    error "--name requires a name argument"
+                fi
+                if [[ "$2" =~ ^- ]]; then
+                    error "--name requires a name argument (got option: $2)"
+                fi
+                OUTPUT_NAME="$2"
+                shift 2
+                ;;
+            --name=*)
+                OUTPUT_NAME="${1#*=}"
+                if [[ -z "$OUTPUT_NAME" ]]; then
+                    error "--name= requires a name argument"
+                fi
+                shift
+                ;;
+            --version=*)
+                BUNDLE_VERSION="${1#*=}"
+                if [[ -z "$BUNDLE_VERSION" ]]; then
+                    error "--version= requires a version argument"
+                fi
+                shift
+                ;;
+            --clean)
+                CLEAN_MODE=true
+                shift
+                ;;
+            --verbose)
+                VERBOSE_MODE=true
+                shift
+                ;;
             *)
                 error "Unknown option: $1"
                 ;;
         esac
     done
 
+    # Handle --name option: if name is set and output is still default, use name
+    if [[ -n "$OUTPUT_NAME" && "$output_file" == "$DEFAULT_OUTPUT" ]]; then
+        output_file="${OUTPUT_NAME}.sh"
+        vlog "Using --name option: output will be $output_file"
+    fi
+
     # Normalize and validate the output path
     output_file=$(normalize_output_path "$output_file")
 
     # Ensure output directory exists
     ensure_output_directory "$output_file"
+
+    # Clean output file if --clean was specified
+    if [[ "$CLEAN_MODE" == "true" ]]; then
+        clean_output_file "$output_file"
+    fi
 
     # Validate the output file
     validate_output_file "$output_file"

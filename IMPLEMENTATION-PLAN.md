@@ -128,19 +128,19 @@ For each component:
 - [x] **Refactor**: Improve artifact management, add versioning support
 
 **0.2.6 Build Options and Flags**
-- [ ] **Red**: Write tests for build options
+- [x] **Red**: Write tests for build options
   - Test: `./build.sh --output /path/to/output` sets output path
   - Test: `./build.sh --name suitey` sets output name
   - Test: `./build.sh --version 1.0.0` includes version in bundle
   - Test: `./build.sh --clean` cleans output before build
   - Test: `./build.sh --verbose` shows detailed build output
   - Test: `./build.sh --help` shows help text
-- [ ] **Green**: Implement build options
+- [x] **Green**: Implement build options
   - Parse command-line arguments
   - Apply options to build process
   - Add verbose logging
   - Add help text
-- [ ] **Refactor**: Improve option handling, add more options
+- [x] **Refactor**: Improve option handling, add more options
 
 **0.2.7 Build Process Integration**
 - [ ] **Red**: Write integration test `tests/bats/integration/build_process.bats`
