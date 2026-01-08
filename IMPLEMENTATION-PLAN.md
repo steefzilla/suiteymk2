@@ -171,15 +171,15 @@ For each component:
 #### TDD Steps:
 
 **0.3.1 Script Existence and Executability**
-- [ ] **Red**: Write test `tests/bats/unit/suitey_basic.bats` for script basics
+- [x] **Red**: Write test `tests/bats/unit/suitey_basic.bats` for script basics
   - Test: `suitey.sh` file exists (after build)
   - Test: `suitey.sh` is executable
   - Test: Script has shebang (`#!/usr/bin/env bash`)
   - Test: Script can be executed without errors
-- [ ] **Green**: Ensure `build.sh` creates `suitey.sh` with correct structure
+- [x] **Green**: Ensure `build.sh` creates `suitey.sh` with correct structure
   - Verify build output has shebang
   - Verify build output is executable
-- [ ] **Refactor**: Ensure proper permissions, shebang correctness
+- [x] **Refactor**: Ensure proper permissions, shebang correctness
 
 **0.3.2 Help Text Display**
 - [ ] **Red**: Write tests for help functionality
