@@ -10,6 +10,17 @@ For each component:
 3. **Refactor**: Improve code quality while keeping tests green
 4. **Repeat**: Move to next test/feature
 
+### Completion Requirement
+
+**A step is only considered complete when all tests pass with no failures.**
+
+Before marking any step (Red, Green, or Refactor) as complete, you must:
+- Run `bats -rj 16 tests` (or equivalent: `bats -r -j 16 tests`)
+- Verify that all tests pass with zero failures
+- Ensure no regressions were introduced
+
+This requirement applies to all phases and ensures code quality and test coverage throughout the implementation.
+
 ## Phase 0: Environment Setup and Basic Script Foundation (Prerequisites)
 
 ### 0.1 Environment Test Suite
