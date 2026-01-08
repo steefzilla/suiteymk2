@@ -143,13 +143,13 @@ For each component:
 - [x] **Refactor**: Improve option handling, add more options
 
 **0.2.7 Build Process Integration**
-- [ ] **Red**: Write integration test `tests/bats/integration/build_process.bats`
+- [x] **Red**: Write integration test `tests/bats/integration/build_process.bats`
   - Test: Full build process creates working `suitey.sh` executable
   - Test: Built `suitey.sh` contains all source files
   - Test: Built `suitey.sh` contains all modules
   - Test: Build process respects filesystem isolation (only writes to project root and `/tmp`)
-- [ ] **Green**: Ensure build process works end-to-end
-- [ ] **Refactor**: Optimize build process, improve error messages
+- [x] **Green**: Ensure build process works end-to-end
+- [x] **Refactor**: Optimize build process, improve error messages
 
 **Acceptance Criteria**:
 - `build.sh` exists and is executable
