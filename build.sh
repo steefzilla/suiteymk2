@@ -355,8 +355,39 @@ show_version() {
     echo "Build system functional - ready for implementation"
 }
 
+# Run all environment validation checks
+# Returns 0 if all checks pass, 1 if any check fails
+run_environment_checks() {
+    local check_failed=0
+
+    # Run all environment checks
+    if ! check_bash_version; then
+        check_failed=1
+    fi
+
+    if ! check_docker_installed; then
+        check_failed=1
+    fi
+
+    if ! check_docker_daemon_running; then
+        check_failed=1
+    fi
+
+    if ! check_tmp_writable; then
+        check_failed=1
+    fi
+
+    # Return failure if any check failed
+    if [[ $check_failed -eq 1 ]]; then
+        return 1
+    fi
+
+    return 0
+}
+
 main() {
     # Parse command-line arguments
+    # Skip environment checks for help/version commands
     if [[ $# -eq 0 ]]; then
         # No arguments provided, show help
         show_help
@@ -373,6 +404,15 @@ main() {
             exit $EXIT_SUCCESS
             ;;
         *)
+            # For other commands, run environment checks first
+            if ! run_environment_checks; then
+                echo "" >&2
+                echo "Environment validation failed. Please fix the issues above and try again." >&2
+                exit $EXIT_SUITEY_ERROR
+            fi
+            
+            # Placeholder for future command handling
+            # For now, unknown options are handled below
             echo "Error: Unknown option '$1'" >&2
             echo "Run '$0 --help' for usage information." >&2
             exit $EXIT_SUITEY_ERROR

@@ -211,18 +211,18 @@ For each component:
 - [x] **Refactor**: Ensure consistent exit code usage
 
 **0.3.4 Script Structure and Environment Integration**
-- [ ] **Red**: Write tests for script structure
+- [x] **Red**: Write tests for script structure
   - Test: Script sources `src/environment.sh` functions (bundled in)
   - Test: Script defines main function
   - Test: Script calls main function at end
   - Test: Script runs environment checks before main execution
   - Test: Script handles environment check failures gracefully
-- [ ] **Green**: Implement basic script structure in source files
+- [x] **Green**: Implement basic script structure in source files
   - Source environment validation functions (bundled by build)
   - Define `main()` function
   - Call `main "$@"` at end
   - Integrate environment checks
-- [ ] **Refactor**: Organize script layout, add comments, improve error handling
+- [x] **Refactor**: Organize script layout, add comments, improve error handling
 
 **0.3.5 Basic Script Running**
 - [ ] **Red**: Write integration test `tests/bats/integration/suitey_basic.bats`
