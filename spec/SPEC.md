@@ -2,7 +2,7 @@
 
 ## Overview
 
-Suitey is a cross-platform tool designed to automatically discover, build (if needed), and run tests locally from any project, regardless of the test framework or build system used. It eliminates the need to know which testing tools a project uses, how to build it, or how to configure them. Simply run `suitey` in any project directory, and it will detect build requirements, execute builds in containerized environments, and run all available test suites in parallel, providing a unified dashboard view of build and test execution status.
+Suitey is a cross-platform tool designed to automatically discover, build (if needed), and run tests locally from any project, regardless of the test framework or build system used. It eliminates the need to know which testing tools a project uses, how to build it, or how to configure them. Simply run `suitey.sh [DIRECTORY]` (e.g., `suitey.sh .` for the current directory) and it will detect build requirements, execute builds in containerized environments, and run all available test suites in parallel, providing a unified dashboard view of build and test execution status.
 
 Example dashboard display:
 
@@ -57,7 +57,7 @@ Several tools address parts of Suitey's functionality, but none provide the comp
 
 ### Target Use Cases
 
-- **New Developer Onboarding**: Run `suitey` to immediately see and execute all tests
+- **New Developer Onboarding**: Run `suitey.sh [DIRECTORY]` (e.g., `suitey.sh .`) to immediately see and execute all tests
 - **Multi-Language Projects**: Unified test execution across different parts of a monorepo
 - **Legacy Projects**: Test execution without understanding historical build/test setup
 - **Rapid Prototyping**: Quick test execution without framework setup overhead
@@ -365,6 +365,30 @@ Supported languages:
   - During report server hosting: stop report server container and exit
 - Graceful termination timeout should be reasonable (e.g., 10-30 seconds) to prevent indefinite waiting
 - All Docker containers created by suitey should be tracked and cleaned up on interruption
+
+### Command-Line Interface
+
+Suitey is invoked via the `suitey.sh` script:
+
+**Basic Usage:**
+- `suitey.sh` - Shows help text (default behavior when no arguments provided)
+- `suitey.sh [DIRECTORY]` - Runs Suitey on the specified directory (e.g., `suitey.sh .` to run on current directory)
+- `suitey.sh --help` or `suitey.sh -h` - Shows help text
+- `suitey.sh --version` or `suitey.sh -v` - Shows version information
+
+**Directory Argument:**
+- When a directory path is provided as an argument, Suitey will run on that directory
+- The directory path can be relative (e.g., `.`, `../other-project`) or absolute (e.g., `/path/to/project`)
+- If no directory is specified, Suitey shows help text
+- The directory must exist and be readable
+
+**Options:**
+- `-h, --help` - Display help information and exit
+- `-v, --version` - Display version information and exit
+
+**Future Options** (to be implemented in later phases):
+- `--suite SUITE_NAME` - Run only the specified test suite
+- `--verbose` - Enable verbose output
 
 ### Exit Codes
 

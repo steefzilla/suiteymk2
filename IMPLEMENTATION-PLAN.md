@@ -234,11 +234,33 @@ For each component:
 - [ ] **Green**: Ensure script runs correctly end-to-end
 - [ ] **Refactor**: Optimize script execution, improve user experience
 
+**0.3.6 Directory Argument Handling**
+- [ ] **Red**: Write tests for directory argument handling
+  - Test: `./suitey.sh` (no args) shows help text
+  - Test: `./suitey.sh .` accepts current directory as argument
+  - Test: `./suitey.sh /path/to/dir` accepts absolute directory path
+  - Test: `./suitey.sh ../other-project` accepts relative directory path
+  - Test: `./suitey.sh --help` still shows help (options take precedence)
+  - Test: `./suitey.sh --version` still shows version (options take precedence)
+  - Test: `./suitey.sh nonexistent-dir` exits with error code 2
+  - Test: `./suitey.sh /nonexistent/path` exits with error code 2
+  - Test: Directory argument is validated (exists, is readable)
+- [ ] **Green**: Implement directory argument handling in main script
+  - Parse directory argument (non-option argument)
+  - Validate directory exists and is readable
+  - Store directory path for future use (workflow execution)
+  - Options (`--help`, `--version`) take precedence over directory argument
+  - Show appropriate error messages for invalid directories
+- [ ] **Refactor**: Improve argument parsing, add directory normalization (resolve relative paths)
+
 **Acceptance Criteria**:
 - `suitey.sh` exists after build (created by `build.sh`)
 - `suitey.sh` is executable
 - Help text displays correctly for `--help` and `-h`
 - Script exits with code 0 when showing help
+- Script shows help when run without arguments
+- Script accepts directory argument (e.g., `suitey.sh .` or `suitey.sh /path/to/dir`)
+- Script validates directory argument (exists, readable)
 - Script integrates with environment validation
 - Script structure is organized and maintainable
 - Script can be run successfully
@@ -844,16 +866,18 @@ For each component:
 
 **5.1.1 Command-Line Interface**
 - [ ] **Red**: Write test `tests/bats/integration/suitey_cli.bats`
-  - Test: Parse command-line arguments
+  - Test: Parse command-line arguments (basic directory handling done in Phase 0.3.6)
   - Test: Handle `--suite` option
   - Test: Handle `--verbose` option
   - Test: Handle invalid arguments (exit code 2)
-- [ ] **Green**: Implement CLI in `src/suitey.sh`
+  - Test: Options work correctly with directory argument (e.g., `suitey.sh . --verbose`)
+- [ ] **Green**: Implement additional CLI options in `src/suitey.sh`
+  - Note: Basic directory argument handling is already implemented in Phase 0.3.6
 - [ ] **Refactor**: Improve argument parsing, help text
 
 **5.1.2 Workflow Orchestration**
 - [ ] **Red**: Write integration test for full workflow
-  - Test: Run `suitey` in project directory
+  - Test: Run `suitey.sh [DIRECTORY]` on project directory (directory argument from Phase 0.3.6)
   - Test: Execute complete workflow (init → discovery → build → execution)
   - Test: Display results correctly
   - Test: Generate report
