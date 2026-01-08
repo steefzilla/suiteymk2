@@ -10,7 +10,7 @@ For each component:
 3. **Refactor**: Improve code quality while keeping tests green
 4. **Repeat**: Move to next test/feature
 
-## Phase 0: Environment Setup and Basic Script (Prerequisites)
+## Phase 0: Environment Setup and Basic Script Foundation (Prerequisites)
 
 ### 0.1 Environment Test Suite
 
@@ -26,7 +26,9 @@ For each component:
   - Test: Required directories exist (`src/`, `tests/bats/`, `mod/`)
   - Test: `/tmp` directory is writable
   - Test: Required test dependencies are available (BATS, bats-support, bats-assert)
-- [ ] **Green**: Implement environment validation checks
+- [ ] **Green**: Implement environment validation checks in `src/environment.sh`
+  - Use existing `check_bash_version()`, `check_docker_installed()`, etc.
+  - Ensure all checks return appropriate exit codes
 - [ ] **Refactor**: Improve error messages, add helpful setup instructions
 
 **0.1.2 Filesystem Isolation Validation**
@@ -34,6 +36,7 @@ For each component:
   - Test: Can create files in `/tmp`
   - Test: Cannot write to project directory (read-only test)
   - Test: Temporary directories can be created in `/tmp`
+  - Test: Environment checks respect filesystem isolation principle
 - [ ] **Green**: Implement filesystem isolation validation
 - [ ] **Refactor**: Improve validation logic
 
@@ -41,24 +44,143 @@ For each component:
 - All environment checks pass
 - Clear error messages for missing dependencies
 - Filesystem isolation verified
+- Tests can be run independently
 
 ---
 
-### 0.2 Basic Script Foundation (`suitey.sh`)
+### 0.2 Build System (`build.sh`)
 
-**Goal**: Create the main entry point script with basic help functionality.
+**Goal**: Create a build system to compile/bundle all source scripts into a single `suitey.sh` executable.
+
+**Note**: `suitey.sh` does NOT exist before this phase. It is created by the build system.
 
 #### TDD Steps:
 
-**0.2.1 Script Existence and Executability**
+**0.2.1 Build Script Creation**
+- [ ] **Red**: Write test `tests/bats/unit/build_script.bats` for build script
+  - Test: `build.sh` file exists
+  - Test: `build.sh` is executable
+  - Test: Build script has shebang (`#!/usr/bin/env bash`)
+  - Test: Running `./build.sh --help` shows help text
+  - Test: Running `./build.sh` without args shows usage
+- [ ] **Green**: Create `build.sh` with basic structure
+  - Add shebang
+  - Add help/usage functions
+  - Make executable
+- [ ] **Refactor**: Improve script structure, add error handling
+
+**0.2.2 Source File Discovery**
+- [ ] **Red**: Write tests for source file discovery
+  - Test: Build script can list all source files in `src/`
+  - Test: Build script can list all modules in `mod/`
+  - Test: Build script validates required files exist
+  - Test: Build script handles missing files gracefully
+  - Test: Build script respects dependency order (dependencies first)
+- [ ] **Green**: Implement source file discovery logic
+  - Scan `src/` directory for `.sh` files
+  - Scan `mod/` directory for modules (recursively)
+  - Validate file existence
+  - Determine dependency order (if dependency tracking exists)
+- [ ] **Refactor**: Optimize file discovery, add dependency analysis
+
+**0.2.3 Script Bundling**
+- [ ] **Red**: Write tests for script bundling
+  - Test: Build script creates bundled output file `suitey.sh`
+  - Test: Bundled script contains all source files from `src/`
+  - Test: Bundled script contains all modules from `mod/`
+  - Test: Bundled script has correct shebang (`#!/usr/bin/env bash`)
+  - Test: Bundled script is executable
+  - Test: Source files are included in correct order (dependencies first)
+  - Test: Modules are included after source files
+  - Test: No duplicate includes (each file included once)
+- [ ] **Green**: Implement script bundling
+  - Concatenate source files in dependency order
+  - Include modules in bundle
+  - Add header with version/metadata
+  - Add footer with main execution call
+  - Make output executable
+- [ ] **Refactor**: Improve bundling logic, optimize file order, handle edge cases
+
+**0.2.4 Build Output Validation**
+- [ ] **Red**: Write tests for build output validation
+  - Test: Bundled `suitey.sh` is valid Bash syntax (use `bash -n`)
+  - Test: Bundled `suitey.sh` can be executed
+  - Test: Bundled `suitey.sh` has correct file size (not empty, reasonable size)
+  - Test: Bundled `suitey.sh` contains expected functions
+  - Test: Bundled `suitey.sh` maintains filesystem isolation (only `/tmp`)
+- [ ] **Green**: Implement build validation
+  - Check Bash syntax with `bash -n`
+  - Verify script is executable
+  - Validate script structure
+- [ ] **Refactor**: Improve validation, add more comprehensive checks
+
+**0.2.5 Build Artifacts Management**
+- [ ] **Red**: Write tests for build artifacts
+  - Test: Build creates output `suitey.sh` in project root (or specified location)
+  - Test: Build cleans up temporary files in `/tmp`
+  - Test: Build can specify output directory
+  - Test: Build can specify output filename
+  - Test: Build respects filesystem isolation (only writes to project root and `/tmp`)
+- [ ] **Green**: Implement artifact management
+  - Generate output filename (with optional version/timestamp)
+  - Clean up temporary files in `/tmp`
+  - Support custom output paths
+- [ ] **Refactor**: Improve artifact management, add versioning support
+
+**0.2.6 Build Options and Flags**
+- [ ] **Red**: Write tests for build options
+  - Test: `./build.sh --output /path/to/output` sets output path
+  - Test: `./build.sh --name suitey` sets output name
+  - Test: `./build.sh --version 1.0.0` includes version in bundle
+  - Test: `./build.sh --clean` cleans output before build
+  - Test: `./build.sh --verbose` shows detailed build output
+  - Test: `./build.sh --help` shows help text
+- [ ] **Green**: Implement build options
+  - Parse command-line arguments
+  - Apply options to build process
+  - Add verbose logging
+  - Add help text
+- [ ] **Refactor**: Improve option handling, add more options
+
+**0.2.7 Build Process Integration**
+- [ ] **Red**: Write integration test `tests/bats/integration/build_process.bats`
+  - Test: Full build process creates working `suitey.sh` executable
+  - Test: Built `suitey.sh` contains all source files
+  - Test: Built `suitey.sh` contains all modules
+  - Test: Build process respects filesystem isolation (only writes to project root and `/tmp`)
+- [ ] **Green**: Ensure build process works end-to-end
+- [ ] **Refactor**: Optimize build process, improve error messages
+
+**Acceptance Criteria**:
+- `build.sh` exists and is executable
+- Build script creates self-contained `suitey.sh` executable
+- Built `suitey.sh` contains all source files and modules
+- Built `suitey.sh` is valid Bash and runs correctly
+- Build process is documented
+- Build respects filesystem isolation (only project root and `/tmp`)
+
+---
+
+### 0.3 Basic Script Foundation (`suitey.sh`)
+
+**Goal**: Create the main entry point script with basic help functionality.
+
+**Note**: `suitey.sh` is created by `build.sh` in Phase 0.2. These tests verify the built script works correctly.
+
+#### TDD Steps:
+
+**0.3.1 Script Existence and Executability**
 - [ ] **Red**: Write test `tests/bats/unit/suitey_basic.bats` for script basics
-  - Test: `suitey.sh` file exists
+  - Test: `suitey.sh` file exists (after build)
   - Test: `suitey.sh` is executable
   - Test: Script has shebang (`#!/usr/bin/env bash`)
-- [ ] **Green**: Create `suitey.sh` with shebang and make it executable
+  - Test: Script can be executed without errors
+- [ ] **Green**: Ensure `build.sh` creates `suitey.sh` with correct structure
+  - Verify build output has shebang
+  - Verify build output is executable
 - [ ] **Refactor**: Ensure proper permissions, shebang correctness
 
-**0.2.2 Help Text Display**
+**0.3.2 Help Text Display**
 - [ ] **Red**: Write tests for help functionality
   - Test: Running `./suitey.sh --help` exits with code 0
   - Test: Running `./suitey.sh -h` exits with code 0
@@ -66,33 +188,59 @@ For each component:
   - Test: Help text contains usage information
   - Test: Help text contains available options
   - Test: Running `./suitey.sh` (no args) shows help text
-- [ ] **Green**: Implement help text display in `suitey.sh`
-  - Add `--help` and `-h` option handling
+  - Test: Help text includes version information (if available)
+- [ ] **Green**: Implement help text display in `suitey.sh` (via build system)
+  - Add `--help` and `-h` option handling to main script
   - Display usage information
   - Exit with code 0
+  - Source `src/environment.sh` for environment checks
 - [ ] **Refactor**: Improve help text formatting, add more details
 
-**0.2.3 Basic Exit Codes**
+**0.3.3 Basic Exit Codes**
 - [ ] **Red**: Write tests for exit codes
   - Test: `./suitey.sh --help` exits with code 0
+  - Test: `./suitey.sh -h` exits with code 0
   - Test: `./suitey.sh --invalid-option` exits with code 2 (invalid argument)
   - Test: Script handles errors gracefully
-- [ ] **Green**: Implement exit code logic
+  - Test: Script exits with code 0 when showing help
+- [ ] **Green**: Implement exit code logic in main script
+  - Define exit code constants (0=success, 1=tests failed, 2=suitey error)
+  - Handle help options (exit 0)
+  - Handle invalid options (exit 2)
 - [ ] **Refactor**: Ensure consistent exit code usage
 
-**0.2.4 Script Structure**
+**0.3.4 Script Structure and Environment Integration**
 - [ ] **Red**: Write tests for script structure
-  - Test: Script sources required files (when they exist)
+  - Test: Script sources `src/environment.sh` functions (bundled in)
   - Test: Script defines main function
   - Test: Script calls main function at end
-- [ ] **Green**: Implement basic script structure
-- [ ] **Refactor**: Organize script layout, add comments
+  - Test: Script runs environment checks before main execution
+  - Test: Script handles environment check failures gracefully
+- [ ] **Green**: Implement basic script structure in source files
+  - Source environment validation functions (bundled by build)
+  - Define `main()` function
+  - Call `main "$@"` at end
+  - Integrate environment checks
+- [ ] **Refactor**: Organize script layout, add comments, improve error handling
+
+**0.3.5 Basic Script Running**
+- [ ] **Red**: Write integration test `tests/bats/integration/suitey_basic.bats`
+  - Test: `./suitey.sh --help` runs successfully (exit code 0)
+  - Test: `./suitey.sh -h` runs successfully (exit code 0)
+  - Test: Script shows help text when run without arguments
+  - Test: Script validates environment before execution
+  - Test: Script respects filesystem isolation (only reads project, writes to `/tmp`)
+- [ ] **Green**: Ensure script runs correctly end-to-end
+- [ ] **Refactor**: Optimize script execution, improve user experience
 
 **Acceptance Criteria**:
-- `suitey.sh` exists and is executable
-- Help text displays correctly
-- Exit codes are correct (0 for help, 2 for invalid args)
+- `suitey.sh` exists after build (created by `build.sh`)
+- `suitey.sh` is executable
+- Help text displays correctly for `--help` and `-h`
+- Script exits with code 0 when showing help
+- Script integrates with environment validation
 - Script structure is organized and maintainable
+- Script can be run successfully
 
 ---
 
