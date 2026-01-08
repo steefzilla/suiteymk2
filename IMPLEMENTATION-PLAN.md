@@ -19,17 +19,17 @@ For each component:
 #### TDD Steps:
 
 **0.1.1 Environment Validation Tests**
-- [ ] **Red**: Write test `tests/bats/unit/environment.bats` for environment validation
+- [x] **Red**: Write test `tests/bats/unit/environment.bats` for environment validation
   - Test: Bash version is 4.0 or higher
   - Test: Docker is installed and accessible
   - Test: Docker daemon is running
   - Test: Required directories exist (`src/`, `tests/bats/`, `mod/`)
   - Test: `/tmp` directory is writable
   - Test: Required test dependencies are available (BATS, bats-support, bats-assert)
-- [ ] **Green**: Implement environment validation checks in `src/environment.sh`
+- [x] **Green**: Implement environment validation checks in `src/environment.sh`
   - Use existing `check_bash_version()`, `check_docker_installed()`, etc.
   - Ensure all checks return appropriate exit codes
-- [ ] **Refactor**: Improve error messages, add helpful setup instructions
+- [x] **Refactor**: Improve error messages, add helpful setup instructions
 
 **0.1.2 Filesystem Isolation Validation**
 - [ ] **Red**: Write tests for filesystem isolation
