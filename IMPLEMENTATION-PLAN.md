@@ -84,7 +84,7 @@ For each component:
 - [x] **Refactor**: Optimize file discovery, add dependency analysis
 
 **0.2.3 Script Bundling**
-- [ ] **Red**: Write tests for script bundling
+- [x] **Red**: Write tests for script bundling
   - Test: Build script creates bundled output file `suitey.sh`
   - Test: Bundled script contains all source files from `src/`
   - Test: Bundled script contains all modules from `mod/`
@@ -93,13 +93,13 @@ For each component:
   - Test: Source files are included in correct order (dependencies first)
   - Test: Modules are included after source files
   - Test: No duplicate includes (each file included once)
-- [ ] **Green**: Implement script bundling
+- [x] **Green**: Implement script bundling
   - Concatenate source files in dependency order
   - Include modules in bundle
   - Add header with version/metadata
   - Add footer with main execution call
   - Make output executable
-- [ ] **Refactor**: Improve bundling logic, optimize file order, handle edge cases
+- [x] **Refactor**: Improve bundling logic, optimize file order, handle edge cases
 
 **0.2.4 Build Output Validation**
 - [ ] **Red**: Write tests for build output validation
