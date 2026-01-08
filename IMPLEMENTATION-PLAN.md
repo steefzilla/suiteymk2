@@ -102,17 +102,17 @@ For each component:
 - [x] **Refactor**: Improve bundling logic, optimize file order, handle edge cases
 
 **0.2.4 Build Output Validation**
-- [ ] **Red**: Write tests for build output validation
+- [x] **Red**: Write tests for build output validation
   - Test: Bundled `suitey.sh` is valid Bash syntax (use `bash -n`)
   - Test: Bundled `suitey.sh` can be executed
   - Test: Bundled `suitey.sh` has correct file size (not empty, reasonable size)
   - Test: Bundled `suitey.sh` contains expected functions
   - Test: Bundled `suitey.sh` maintains filesystem isolation (only `/tmp`)
-- [ ] **Green**: Implement build validation
+- [x] **Green**: Implement build validation
   - Check Bash syntax with `bash -n`
   - Verify script is executable
   - Validate script structure
-- [ ] **Refactor**: Improve validation, add more comprehensive checks
+- [x] **Refactor**: Improve validation, add more comprehensive checks
 
 **0.2.5 Build Artifacts Management**
 - [ ] **Red**: Write tests for build artifacts

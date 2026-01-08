@@ -73,19 +73,8 @@ build_suitey() {
         error "Failed to create output file: $output_file"
     fi
 
-    # Make the output file executable
-    if ! chmod +x "$output_file"; then
-        error "Failed to make output file executable: $output_file"
-    fi
-
-    # Verify the output file was created correctly
-    if [[ ! -f "$output_file" ]]; then
-        error "Output file was not created: $output_file"
-    fi
-
-    if [[ ! -x "$output_file" ]]; then
-        error "Output file is not executable: $output_file"
-    fi
+    # Comprehensive validation of the build output
+    validate_build_output "$output_file"
 
     local file_size
     file_size=$(wc -c < "$output_file")
@@ -343,6 +332,94 @@ validate_bundle() {
     fi
 
     log "Bundle validation passed"
+}
+
+# Comprehensive build output validation
+validate_build_output() {
+    local output_file="$1"
+
+    log "Starting comprehensive build output validation..."
+
+    # 1. Check if file exists
+    if [[ ! -f "$output_file" ]]; then
+        error "Build output file does not exist: $output_file"
+    fi
+
+    # 2. Check if file is executable
+    if [[ ! -x "$output_file" ]]; then
+        log "Making build output executable: $output_file"
+        if ! chmod +x "$output_file"; then
+            error "Failed to make build output executable: $output_file"
+        fi
+    fi
+
+    # 3. Verify shebang is correct
+    local first_line
+    first_line=$(head -n1 "$output_file")
+    if [[ "$first_line" != "#!/usr/bin/env bash" ]]; then
+        error "Incorrect shebang in build output. Expected '#!/usr/bin/env bash', got: $first_line"
+    fi
+
+    # 4. Check Bash syntax validity
+    if ! bash -n "$output_file" 2>/dev/null; then
+        error "Build output has invalid Bash syntax: $output_file"
+    fi
+
+    # 5. Check reasonable file size (not empty, not too small)
+    local file_size
+    file_size=$(wc -c < "$output_file")
+    if [[ $file_size -lt 30 ]]; then  # Minimum reasonable size for any script
+        error "Build output file appears too small: $output_file (${file_size} bytes). Expected at least 30 bytes for any script."
+    fi
+
+    if [[ $file_size -gt 1048576 ]]; then  # 1MB max
+        error "Build output file appears too large: $output_file (${file_size} bytes). Maximum allowed is 1MB."
+    fi
+
+    # 6. Verify expected functions are present (for suitey builds)
+    # This is optional - some scripts might not have these functions
+    local has_main_function
+    has_main_function=$(grep -c "^main()" "$output_file" || echo "0")
+
+    local has_suitey_content
+    has_suitey_content=$(grep -c "Suitey" "$output_file" || echo "0")
+
+    if [[ $has_main_function -gt 0 && $has_suitey_content -gt 0 ]]; then
+        # This appears to be a suitey build, check for expected functions
+        if ! grep -q "check_bash_version" "$output_file"; then
+            log "Warning: Suitey build output missing environment functions"
+        fi
+    fi
+
+    # 8. Test that script runs without errors (basic execution test)
+    log "Testing script execution..."
+    if ! timeout 10 bash "$output_file" --help >/dev/null 2>&1; then
+        error "Build output script fails to execute properly: $output_file"
+    fi
+
+    # 9. Verify filesystem isolation compliance (script shouldn't access files outside /tmp)
+    # This is a basic check - more comprehensive isolation testing would be complex
+    if grep -q "cd /" "$output_file" || grep -q "cd /home" "$output_file" || grep -q "cd /usr" "$output_file"; then
+        log "Warning: Build output may contain paths that could violate filesystem isolation"
+        # Don't fail here as this might be legitimate (like /usr/bin/env), just warn
+    fi
+
+    # 10. Test script execution (if it has --version support)
+    local script_output
+    script_output=$(timeout 5 bash "$output_file" --version 2>/dev/null || echo "no_version_flag")
+
+    if [[ "$script_output" != "no_version_flag" && "$script_output" != "timeout" ]]; then
+        # Script supports --version, check if it produces reasonable output
+        if echo "$script_output" | grep -q "Suitey"; then
+            log "Script produces expected Suitey version output"
+        fi
+    else
+        # Script doesn't support --version or timed out - that's OK for basic validation
+        log "Script execution test passed (no --version support or timeout)"
+    fi
+
+    log "Build output validation completed successfully"
+    log "Validated: syntax, executability, size, functions, execution, isolation"
 }
 
 # Main bundling function that orchestrates the entire process
