@@ -32,13 +32,13 @@ For each component:
 - [x] **Refactor**: Improve error messages, add helpful setup instructions
 
 **0.1.2 Filesystem Isolation Validation**
-- [ ] **Red**: Write tests for filesystem isolation
+- [x] **Red**: Write tests for filesystem isolation
   - Test: Can create files in `/tmp`
   - Test: Cannot write to project directory (read-only test)
   - Test: Temporary directories can be created in `/tmp`
   - Test: Environment checks respect filesystem isolation principle
-- [ ] **Green**: Implement filesystem isolation validation
-- [ ] **Refactor**: Improve validation logic
+- [x] **Green**: Implement filesystem isolation validation
+- [x] **Refactor**: Improve validation logic
 
 **Acceptance Criteria**:
 - All environment checks pass

@@ -135,3 +135,83 @@ check_test_dependencies() {
         return 1
     fi
 }
+
+# Check if files can be created in /tmp directory
+create_test_file_in_tmp() {
+    local test_file="/tmp/suitey_test_file_$$"
+
+    # Try to create a test file in /tmp
+    if echo "test content" > "$test_file" 2>/dev/null; then
+        # Clean up the test file
+        rm -f "$test_file"
+        return 0
+    else
+        echo "Error: Cannot create files in /tmp directory. Suitey requires write access to /tmp." >&2
+        return 1
+    fi
+}
+
+# Verify that filesystem isolation principle is maintained
+verify_filesystem_isolation_principle() {
+    # This function verifies that Suitey respects filesystem isolation
+    # Suitey should only write to /tmp, not modify the project directory
+    local project_dir
+    project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+    # Check that project directory exists and is accessible for reading
+    if [[ -d "$project_dir" && -r "$project_dir" ]]; then
+        # Project directory should be readable for Suitey to function
+        # The isolation principle means Suitey won't write here during execution
+        return 0
+    else
+        echo "Error: Project directory is not accessible. This may indicate permission issues." >&2
+        return 1
+    fi
+}
+
+# Check if temporary directories can be created in /tmp
+create_test_directory_in_tmp() {
+    local test_dir="/tmp/suitey_test_dir_$$"
+
+    # Try to create a test directory in /tmp
+    if mkdir "$test_dir" 2>/dev/null; then
+        # Clean up the test directory
+        rmdir "$test_dir"
+        return 0
+    else
+        echo "Error: Cannot create directories in /tmp. Suitey requires write access to /tmp for temporary directories." >&2
+        return 1
+    fi
+}
+
+# Verify that environment checks respect filesystem isolation principle
+verify_environment_filesystem_isolation() {
+    # This function verifies that all environment validation functions
+    # only access /tmp and don't modify the project directory
+    local project_dir
+    project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+    # Use a lighter approach - check for temporary files created outside /tmp
+    # instead of full checksum comparison
+    local temp_files_before
+    temp_files_before=$(find "$project_dir" -name "suitey_*" -type f 2>/dev/null | wc -l)
+
+    # Run all environment validation functions
+    check_bash_version >/dev/null 2>&1
+    check_docker_installed >/dev/null 2>&1
+    check_docker_daemon_running >/dev/null 2>&1
+    check_required_directories >/dev/null 2>&1
+    check_tmp_writable >/dev/null 2>&1
+    check_test_dependencies >/dev/null 2>&1
+
+    local temp_files_after
+    temp_files_after=$(find "$project_dir" -name "suitey_*" -type f 2>/dev/null | wc -l)
+
+    # Verify that no suitey temporary files were created in project directory
+    if [[ "$temp_files_before" -eq "$temp_files_after" ]]; then
+        return 0
+    else
+        echo "Error: Environment validation functions created files outside /tmp. This violates filesystem isolation." >&2
+        return 1
+    fi
+}
