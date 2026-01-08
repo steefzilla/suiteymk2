@@ -19,6 +19,7 @@ For each component:
 #### TDD Steps:
 
 **0.1.1 Environment Validation Tests**
+*Create functions to check Bash version, Docker installation, and required directories.*
 - [x] **Red**: Write test `tests/bats/unit/environment.bats` for environment validation
   - Test: Bash version is 4.0 or higher
   - Test: Docker is installed and accessible
@@ -32,6 +33,7 @@ For each component:
 - [x] **Refactor**: Improve error messages, add helpful setup instructions
 
 **0.1.2 Filesystem Isolation Validation**
+*Verify that Suitey only writes to /tmp and doesn't modify project directories.*
 - [x] **Red**: Write tests for filesystem isolation
   - Test: Can create files in `/tmp`
   - Test: Cannot write to project directory (read-only test)
@@ -57,6 +59,7 @@ For each component:
 #### TDD Steps:
 
 **0.2.1 Build Script Creation**
+*Create the build.sh script with basic structure and help functionality.*
 - [x] **Red**: Write test `tests/bats/unit/build_script.bats` for build script
   - Test: `build.sh` file exists
   - Test: `build.sh` is executable
@@ -70,6 +73,7 @@ For each component:
 - [x] **Refactor**: Improve script structure, add error handling
 
 **0.2.2 Source File Discovery**
+*Implement logic to find and list all source files and modules for bundling.*
 - [x] **Red**: Write tests for source file discovery
   - Test: Build script can list all source files in `src/`
   - Test: Build script can list all modules in `mod/`
@@ -84,6 +88,7 @@ For each component:
 - [x] **Refactor**: Optimize file discovery, add dependency analysis
 
 **0.2.3 Script Bundling**
+*Concatenate all source files and modules into a single executable suitey.sh file.*
 - [x] **Red**: Write tests for script bundling
   - Test: Build script creates bundled output file `suitey.sh`
   - Test: Bundled script contains all source files from `src/`
@@ -102,6 +107,7 @@ For each component:
 - [x] **Refactor**: Improve bundling logic, optimize file order, handle edge cases
 
 **0.2.4 Build Output Validation**
+*Validate that the generated suitey.sh has correct syntax, is executable, and contains expected functions.*
 - [x] **Red**: Write tests for build output validation
   - Test: Bundled `suitey.sh` is valid Bash syntax (use `bash -n`)
   - Test: Bundled `suitey.sh` can be executed
@@ -115,6 +121,7 @@ For each component:
 - [x] **Refactor**: Improve validation, add more comprehensive checks
 
 **0.2.5 Build Artifacts Management**
+*Manage build output files, cleanup temporary files, and support custom output paths.*
 - [x] **Red**: Write tests for build artifacts
   - Test: Build creates output `suitey.sh` in project root (or specified location)
   - Test: Build cleans up temporary files in `/tmp`
@@ -128,6 +135,7 @@ For each component:
 - [x] **Refactor**: Improve artifact management, add versioning support
 
 **0.2.6 Build Options and Flags**
+*Add command-line options like --output, --name, --version, --clean, and --verbose to build.sh.*
 - [x] **Red**: Write tests for build options
   - Test: `./build.sh --output /path/to/output` sets output path
   - Test: `./build.sh --name suitey` sets output name
@@ -143,6 +151,7 @@ For each component:
 - [x] **Refactor**: Improve option handling, add more options
 
 **0.2.7 Build Process Integration**
+*Verify the complete build process works end-to-end and creates a functional suitey.sh executable.*
 - [x] **Red**: Write integration test `tests/bats/integration/build_process.bats`
   - Test: Full build process creates working `suitey.sh` executable
   - Test: Built `suitey.sh` contains all source files
@@ -171,6 +180,7 @@ For each component:
 #### TDD Steps:
 
 **0.3.1 Script Existence and Executability**
+*Verify that build.sh creates suitey.sh with correct permissions and shebang.*
 - [x] **Red**: Write test `tests/bats/unit/suitey_basic.bats` for script basics
   - Test: `suitey.sh` file exists (after build)
   - Test: `suitey.sh` is executable
@@ -182,6 +192,7 @@ For each component:
 - [x] **Refactor**: Ensure proper permissions, shebang correctness
 
 **0.3.2 Help Text Display**
+*Implement --help and -h options to display usage information and exit with code 0.*
 - [x] **Red**: Write tests for help functionality
   - Test: Running `./suitey.sh --help` exits with code 0
   - Test: Running `./suitey.sh -h` exits with code 0
@@ -198,6 +209,7 @@ For each component:
 - [x] **Refactor**: Improve help text formatting, add more details
 
 **0.3.3 Basic Exit Codes**
+*Define and use exit code constants (0=success, 1=tests failed, 2=suitey error) throughout the script.*
 - [x] **Red**: Write tests for exit codes
   - Test: `./suitey.sh --help` exits with code 0
   - Test: `./suitey.sh -h` exits with code 0
@@ -211,6 +223,7 @@ For each component:
 - [x] **Refactor**: Ensure consistent exit code usage
 
 **0.3.4 Script Structure and Environment Integration**
+*Integrate environment validation checks into main script execution, running them before commands that need them.*
 - [x] **Red**: Write tests for script structure
   - Test: Script sources `src/environment.sh` functions (bundled in)
   - Test: Script defines main function
@@ -225,6 +238,7 @@ For each component:
 - [x] **Refactor**: Organize script layout, add comments, improve error handling
 
 **0.3.5 Basic Script Running**
+*Verify suitey.sh runs correctly end-to-end with proper help, version, and error handling.*
 - [x] **Red**: Write integration test `tests/bats/integration/suitey_basic.bats`
   - Test: `./suitey.sh --help` runs successfully (exit code 0)
   - Test: `./suitey.sh -h` runs successfully (exit code 0)
@@ -235,6 +249,7 @@ For each component:
 - [x] **Refactor**: Optimize script execution, improve user experience
 
 **0.3.6 Directory Argument Handling**
+*Accept directory path as argument (e.g., suitey.sh .) and validate it exists and is readable before execution.*
 - [ ] **Red**: Write tests for directory argument handling
   - Test: `./suitey.sh` (no args) shows help text
   - Test: `./suitey.sh .` accepts current directory as argument
@@ -276,6 +291,7 @@ For each component:
 #### TDD Steps:
 
 **1.1.1 Basic Key-Value Access**
+*Implement data_get() function to extract values from key=value format data strings.*
 - [ ] **Red**: Write test `tests/bats/unit/data_access.bats` for `data_get()`
   - Test: Extract simple value from `key=value` format
   - Test: Return empty string for missing key
@@ -284,6 +300,7 @@ For each component:
 - [ ] **Refactor**: Optimize string parsing, add error handling
 
 **1.1.2 Array Access**
+*Implement functions to access array elements by index, get array count, and retrieve all array elements.*
 - [ ] **Red**: Write tests for `data_get_array()`, `data_array_count()`, `data_get_array_all()`
   - Test: Extract array element by index
   - Test: Get array count
@@ -293,6 +310,7 @@ For each component:
 - [ ] **Refactor**: Consolidate array logic, improve validation
 
 **1.1.3 Data Modification**
+*Implement functions to set key-value pairs, append to arrays, and replace entire arrays in data strings.*
 - [ ] **Red**: Write tests for `data_set()`, `data_array_append()`, `data_set_array()`
   - Test: Set new key-value pair
   - Test: Update existing key-value pair
@@ -302,6 +320,7 @@ For each component:
 - [ ] **Refactor**: Optimize string manipulation, handle edge cases
 
 **1.1.4 Multi-line Support**
+*Implement functions to store and retrieve multi-line values using heredoc syntax in data strings.*
 - [ ] **Red**: Write tests for `data_set_multiline()`, `data_get_multiline()`
   - Test: Set multi-line value with heredoc syntax
   - Test: Get multi-line value (strip heredoc markers)
@@ -310,6 +329,7 @@ For each component:
 - [ ] **Refactor**: Improve heredoc parsing, handle edge cases
 
 **1.1.5 Data Validation**
+*Implement functions to validate data format and check if keys exist in data strings.*
 - [ ] **Red**: Write tests for `data_validate()`, `data_has_key()`
   - Test: Validate correct data format
   - Test: Reject invalid formats
@@ -332,6 +352,7 @@ For each component:
 #### TDD Steps:
 
 **1.2.1 Module Registration**
+*Implement register_module() to register Suitey modules with validation of required interface methods.*
 - [ ] **Red**: Write test `tests/bats/unit/mod_registry.bats` for module registration
   - Test: Register a module successfully
   - Test: Reject module with duplicate identifier
@@ -341,6 +362,7 @@ For each component:
 - [ ] **Refactor**: Improve validation logic, error messages
 
 **1.2.2 Module Lookup**
+*Implement functions to retrieve modules by identifier, get all modules, and filter by capability.*
 - [ ] **Red**: Write tests for module retrieval
   - Test: Get module by identifier
   - Test: Get all registered modules
@@ -350,6 +372,7 @@ For each component:
 - [ ] **Refactor**: Optimize lookup performance, add caching
 
 **1.2.3 Module Interface Validation**
+*Verify that registered modules implement all required methods with correct signatures.*
 - [ ] **Red**: Write tests for interface compliance checking
   - Test: Verify module implements all required methods
   - Test: Check method signatures match interface
@@ -358,6 +381,7 @@ For each component:
 - [ ] **Refactor**: Improve validation coverage
 
 **1.2.4 Minimal Module Implementation (Rust)**
+*Create mod/languages/rust/mod.sh with stub implementations of detect() and get_metadata() methods.*
 - [ ] **Red**: Write test for Rust module stub
   - Test: Module can be registered
   - Test: Module implements `detect()` method (returns detection result)
@@ -366,6 +390,7 @@ For each component:
 - [ ] **Refactor**: Improve module structure, add documentation
 
 **1.2.5 Minimal Module Implementation (Bash)**
+*Create mod/languages/bash/mod.sh with stub implementations of detect() and get_metadata() methods.*
 - [ ] **Red**: Write test for Bash module stub
   - Test: Module can be registered
   - Test: Module implements `detect()` method
@@ -390,6 +415,7 @@ For each component:
 #### TDD Steps:
 
 **2.1.1 Basic Detection**
+*Implement detect_platforms() to identify programming languages/frameworks present in a project using module detection.*
 - [ ] **Red**: Write test `tests/bats/unit/platform_detector.bats` for platform detection
   - Test: Detect Rust project (presence of `Cargo.toml`)
   - Test: Detect Bash/BATS project (presence of `.bats` files)
@@ -402,6 +428,7 @@ For each component:
 - [ ] **Refactor**: Improve error handling, optimize detection order
 
 **2.1.2 Binary Availability Checking**
+*Verify that required binaries (e.g., cargo, bats) are available for detected platforms, skip with warning if missing.*
 - [ ] **Red**: Write tests for binary checking
   - Test: Verify `cargo` is available for Rust projects
   - Test: Verify `bats` is available for BATS projects
@@ -410,6 +437,7 @@ For each component:
 - [ ] **Refactor**: Improve binary detection, add version checking
 
 **2.1.3 Detection Confidence Levels**
+*Calculate confidence levels (high/medium/low) based on presence of config files, test files, and file extensions.*
 - [ ] **Red**: Write tests for confidence levels
   - Test: High confidence when config file + test files present
   - Test: Medium confidence when only test files present
@@ -418,6 +446,7 @@ For each component:
 - [ ] **Refactor**: Refine confidence heuristics
 
 **2.1.4 Integration with Modules Registry**
+*Integrate Platform Detector with Modules Registry to use registered modules for platform detection.*
 - [ ] **Red**: Write integration test
   - Test: Platform Detector uses Modules Registry to get modules
   - Test: Detection results include module metadata
@@ -440,6 +469,7 @@ For each component:
 #### TDD Steps:
 
 **2.2.1 Basic Test File Discovery**
+*Implement discover_test_suites() to find and list test files for detected platforms using module discovery methods.*
 - [ ] **Red**: Write test `tests/bats/unit/test_suite_detector.bats` for test discovery
   - Test: Discover Rust unit tests in `src/` directory
   - Test: Discover Rust integration tests in `tests/` directory
@@ -451,6 +481,7 @@ For each component:
 - [ ] **Refactor**: Improve discovery logic, handle edge cases
 
 **2.2.2 Suite Grouping**
+*Group discovered test files into distinct test suites (e.g., one suite per BATS file, unit vs integration for Rust).*
 - [ ] **Red**: Write tests for suite grouping
   - Test: Group BATS files by file (one suite per file)
   - Test: Group Rust tests by type (unit vs integration)
@@ -459,6 +490,7 @@ For each component:
 - [ ] **Refactor**: Improve grouping strategies
 
 **2.2.3 Test Counting**
+*Count individual tests in test files (e.g., @test annotations in BATS, #[test] functions in Rust) using module parsing.*
 - [ ] **Red**: Write tests for test counting
   - Test: Count `@test` annotations in BATS files
   - Test: Count `#[test]` functions in Rust files
@@ -467,6 +499,7 @@ For each component:
 - [ ] **Refactor**: Optimize counting, handle edge cases
 
 **2.2.4 Integration with Platform Detector**
+*Integrate Test Suite Detector with Platform Detector to only discover tests for detected platforms.*
 - [ ] **Red**: Write integration test
   - Test: Test Suite Detector uses Platform Detector results
   - Test: Only detects tests for detected platforms
@@ -489,6 +522,7 @@ For each component:
 #### TDD Steps:
 
 **2.3.1 Build Requirement Detection**
+*Implement detect_build_requirements() to determine if projects need building before testing using module detection.*
 - [ ] **Red**: Write test `tests/bats/unit/build_system_detector.bats` for build detection
   - Test: Detect Rust requires build (`Cargo.toml` present)
   - Test: Detect BATS does not require build
@@ -500,6 +534,7 @@ For each component:
 - [ ] **Refactor**: Improve detection logic
 
 **2.3.2 Build Step Identification**
+*Identify build commands (e.g., cargo build, make targets) required for each platform using module get_build_steps().*
 - [ ] **Red**: Write tests for build step identification
   - Test: Identify `cargo build` for Rust projects
   - Test: Identify build commands from `Makefile`
@@ -508,6 +543,7 @@ For each component:
 - [ ] **Refactor**: Improve step identification
 
 **2.3.3 Build Dependency Analysis**
+*Analyze dependencies between build steps to determine execution order and identify parallelizable builds.*
 - [ ] **Red**: Write tests for dependency analysis
   - Test: Identify build dependencies between frameworks
   - Test: Determine build execution order
@@ -530,6 +566,7 @@ For each component:
 #### TDD Steps:
 
 **2.4.1 Orchestration Workflow**
+*Implement scan_project() to coordinate Platform Detection, Test Suite Detection, and Build System Detection in order.*
 - [ ] **Red**: Write test `tests/bats/unit/project_scanner.bats` for orchestration
   - Test: Calls Platform Detector first
   - Test: Calls Test Suite Detector after Platform Detection
@@ -541,6 +578,7 @@ For each component:
 - [ ] **Refactor**: Improve orchestration logic, error handling
 
 **2.4.2 Result Aggregation**
+*Combine results from all detection phases (platforms, test suites, build requirements) into unified data structure.*
 - [ ] **Red**: Write tests for result aggregation
   - Test: Combine platform detection results
   - Test: Combine test suite results
@@ -550,6 +588,7 @@ For each component:
 - [ ] **Refactor**: Improve aggregation logic
 
 **2.4.3 Error Handling**
+*Handle detection failures gracefully, continue with other detectors when one fails, and provide clear error messages.*
 - [ ] **Red**: Write tests for error handling
   - Test: Handle Platform Detector failures gracefully
   - Test: Continue with other detectors when one fails
@@ -558,6 +597,7 @@ For each component:
 - [ ] **Refactor**: Improve error messages, recovery
 
 **2.4.4 End-to-End Integration Test**
+*Verify complete scanning workflow detects platforms, discovers test suites, and identifies build requirements correctly.*
 - [ ] **Red**: Write integration test for full scanning workflow
   - Test: Scan multi-platform project (Rust + BATS)
   - Test: Verify all platforms detected
@@ -583,6 +623,7 @@ For each component:
 #### TDD Steps:
 
 **3.1.1 Docker Container Management**
+*Implement container lifecycle management: launch build containers with correct mounts, track containers, and clean up on completion.*
 - [ ] **Red**: Write test `tests/bats/unit/build_manager.bats` (with Docker mocking)
   - Test: Launch build container with correct configuration
   - Test: Mount project directory read-only
@@ -592,6 +633,7 @@ For each component:
 - [ ] **Refactor**: Improve container lifecycle management
 
 **3.1.2 Build Execution**
+*Execute build commands in Docker containers, capture output and exit codes, and track build duration.*
 - [ ] **Red**: Write tests for build execution
   - Test: Execute build command in container
   - Test: Capture build output (stdout/stderr)
@@ -601,6 +643,7 @@ For each component:
 - [ ] **Refactor**: Improve build monitoring, error handling
 
 **3.1.3 Multi-Core Build Support**
+*Allocate multiple CPU cores to build containers and use parallel build flags (e.g., -j$(nproc)) for faster builds.*
 - [ ] **Red**: Write tests for multi-core support
   - Test: Allocate multiple CPU cores to build container
   - Test: Use parallel build flags (`-j$(nproc)`)
@@ -609,6 +652,7 @@ For each component:
 - [ ] **Refactor**: Optimize core allocation strategy
 
 **3.1.4 Test Image Creation**
+*Generate Dockerfiles and build Docker images containing build artifacts, source code, and test suites for test execution.*
 - [ ] **Red**: Write tests for test image creation
   - Test: Generate Dockerfile for test image
   - Test: Build Docker image with artifacts
@@ -619,6 +663,7 @@ For each component:
 - [ ] **Refactor**: Optimize Dockerfile generation, image building
 
 **3.1.5 Parallel Build Execution**
+*Run independent builds in parallel while waiting for dependent builds sequentially, handling failures gracefully.*
 - [ ] **Red**: Write tests for parallel builds
   - Test: Run independent builds in parallel
   - Test: Wait for dependent builds sequentially
@@ -627,6 +672,7 @@ For each component:
 - [ ] **Refactor**: Improve parallel execution management
 
 **3.1.6 Integration Test with Real Docker**
+*Verify build manager works with real Docker: builds projects, creates test images, and verifies artifacts are present.*
 - [ ] **Red**: Write integration test `tests/bats/integration/build_manager.bats`
   - Test: Build simple Rust project
   - Test: Create test image successfully
@@ -649,6 +695,7 @@ For each component:
 #### TDD Steps:
 
 **3.2.1 Test Container Execution**
+*Launch test containers with pre-built images, execute test commands, and capture test output and exit codes.*
 - [ ] **Red**: Write test `tests/bats/unit/execution_system.bats` (with Docker mocking)
   - Test: Launch test container with pre-built image
   - Test: Execute test command in container
@@ -658,6 +705,7 @@ For each component:
 - [ ] **Refactor**: Improve container management
 
 **3.2.2 Result Collection**
+*Collect test results (exit codes, stdout/stderr, duration) from containers and write structured results to /tmp.*
 - [ ] **Red**: Write tests for result collection
   - Test: Collect exit code from test container
   - Test: Collect test output (stdout/stderr)
@@ -667,6 +715,7 @@ For each component:
 - [ ] **Refactor**: Optimize result storage
 
 **3.2.3 Result Parsing**
+*Parse test output to extract test counts and individual test results using module parse_test_results() methods.*
 - [ ] **Red**: Write tests for result parsing
   - Test: Parse test counts from Rust output
   - Test: Parse test counts from BATS output
@@ -676,6 +725,7 @@ For each component:
 - [ ] **Refactor**: Improve parsing accuracy
 
 **3.2.4 Integration with Modules Registry**
+*Use module execution and parsing methods from Modules Registry, handling missing modules gracefully.*
 - [ ] **Red**: Write tests for module integration
   - Test: Use module's execution method
   - Test: Use module's parsing method
@@ -684,6 +734,7 @@ For each component:
 - [ ] **Refactor**: Improve integration
 
 **3.2.5 Integration Test with Real Docker**
+*Verify execution system works with real Docker: executes Rust and BATS tests in containers and collects results correctly.*
 - [ ] **Red**: Write integration test `tests/bats/integration/execution_system.bats`
   - Test: Execute Rust tests in container
   - Test: Execute BATS tests in container
@@ -706,6 +757,7 @@ For each component:
 #### TDD Steps:
 
 **3.3.1 Parallel Launch**
+*Launch multiple test suites in parallel Docker containers, limiting parallelism by CPU core count and tracking all containers.*
 - [ ] **Red**: Write test `tests/bats/unit/parallel_execution.bats`
   - Test: Launch multiple test suites in parallel
   - Test: Limit parallelism by CPU core count
@@ -714,6 +766,7 @@ For each component:
 - [ ] **Refactor**: Improve parallel execution management
 
 **3.3.2 Result Monitoring**
+*Poll result files in /tmp as tests complete, update status in real-time, and handle test failures gracefully.*
 - [ ] **Red**: Write tests for result monitoring
   - Test: Poll result files in `/tmp` as tests complete
   - Test: Update status as tests finish
@@ -722,6 +775,7 @@ For each component:
 - [ ] **Refactor**: Optimize polling, reduce overhead
 
 **3.3.3 Signal Handling**
+*Handle SIGINT (Ctrl+C) gracefully: terminate containers on first signal, force kill on second signal, and clean up on exit.*
 - [ ] **Red**: Write tests for signal handling
   - Test: Handle SIGINT (first Ctrl+C) gracefully
   - Test: Terminate all containers on SIGINT
@@ -731,6 +785,7 @@ For each component:
 - [ ] **Refactor**: Improve cleanup logic
 
 **3.3.4 Resource Management**
+*Limit concurrent containers by CPU count, clean up containers after completion, and remove temporary files from /tmp.*
 - [ ] **Red**: Write tests for resource management
   - Test: Limit concurrent containers by CPU count
   - Test: Clean up containers after completion
@@ -755,6 +810,7 @@ For each component:
 #### TDD Steps:
 
 **4.1.1 Output Streaming**
+*Stream raw test output to stdout/stderr with suite identification prefixes, buffering output by suite for readability.*
 - [ ] **Red**: Write test `tests/bats/unit/verbose_formatter.bats`
   - Test: Stream test output with suite identification prefix
   - Test: Buffer output by suite for readability
@@ -763,6 +819,7 @@ For each component:
 - [ ] **Refactor**: Optimize buffering, improve readability
 
 **4.1.2 Post-Completion Output**
+*Output all tests in execution order after completion, displaying stack traces for failures and errors.*
 - [ ] **Red**: Write tests for post-completion output
   - Test: Output all tests in execution order
   - Test: Display stack traces for failures
@@ -784,6 +841,7 @@ For each component:
 #### TDD Steps:
 
 **4.2.1 Dashboard Display**
+*Display real-time dashboard with columns showing suite status, build status, and test counts that update as tests execute.*
 - [ ] **Red**: Write test `tests/bats/unit/dashboard_formatter.bats`
   - Test: Display dashboard header with columns
   - Test: Update suite status in real-time
@@ -793,6 +851,7 @@ For each component:
 - [ ] **Refactor**: Improve display formatting, optimize updates
 
 **4.2.2 Real-Time Updates**
+*Poll /tmp for result files, update dashboard when new results are available, and refresh display without flickering.*
 - [ ] **Red**: Write tests for real-time updates
   - Test: Poll `/tmp` for result files
   - Test: Update dashboard when new results available
@@ -801,6 +860,7 @@ For each component:
 - [ ] **Refactor**: Optimize polling frequency, reduce CPU usage
 
 **4.2.3 Final Summary**
+*Display overall test results, build results (if builds executed), and link to HTML report after all tests complete.*
 - [ ] **Red**: Write tests for final summary
   - Test: Display overall test results
   - Test: Display build results (if builds executed)
@@ -822,6 +882,7 @@ For each component:
 #### TDD Steps:
 
 **4.3.1 HTML Report Generation**
+*Generate comprehensive HTML reports from test results including summary statistics, detailed results, and build information.*
 - [ ] **Red**: Write test `tests/bats/unit/report_generation.bats`
   - Test: Generate HTML report from test results
   - Test: Include summary statistics
@@ -832,6 +893,7 @@ For each component:
 - [ ] **Refactor**: Improve HTML structure, styling
 
 **4.3.2 Report Hosting**
+*Launch nginx container with report directory mounted, serve reports on localhost:8080, and handle port conflicts automatically.*
 - [ ] **Red**: Write tests for report hosting
   - Test: Launch nginx container with report directory mounted
   - Test: Serve report on localhost:8080
@@ -841,6 +903,7 @@ For each component:
 - [ ] **Refactor**: Improve container management
 
 **4.3.3 Report Container Lifecycle**
+*Manage report container lifecycle: runs until user stops it, cleans up on SIGINT, and tracks container ID for cleanup.*
 - [ ] **Red**: Write tests for container lifecycle
   - Test: Container runs until user stops it
   - Test: Clean up container on SIGINT
@@ -865,6 +928,7 @@ For each component:
 #### TDD Steps:
 
 **5.1.1 Command-Line Interface**
+*Add additional CLI options (--suite, --verbose) to suitey.sh, working with directory argument from Phase 0.3.6.*
 - [ ] **Red**: Write test `tests/bats/integration/suitey_cli.bats`
   - Test: Parse command-line arguments (basic directory handling done in Phase 0.3.6)
   - Test: Handle `--suite` option
@@ -876,6 +940,7 @@ For each component:
 - [ ] **Refactor**: Improve argument parsing, help text
 
 **5.1.2 Workflow Orchestration**
+*Orchestrate complete workflow: initialize, scan project, build (if needed), execute tests, display results, and generate report.*
 - [ ] **Red**: Write integration test for full workflow
   - Test: Run `suitey.sh [DIRECTORY]` on project directory (directory argument from Phase 0.3.6)
   - Test: Execute complete workflow (init → discovery → build → execution)
@@ -885,6 +950,7 @@ For each component:
 - [ ] **Refactor**: Improve error handling, user experience
 
 **5.1.3 Exit Codes**
+*Implement exit code logic: 0 when all tests pass, 1 when tests fail, 2 when suitey error occurs.*
 - [ ] **Red**: Write tests for exit codes
   - Test: Exit code 0 when all tests pass
   - Test: Exit code 1 when tests fail
