@@ -436,12 +436,12 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **1.2.8 Minimal Framework Module Implementation (BATS)**
 *Create mod/frameworks/bats/mod.sh with framework-specific implementations for Bash/BATS.*
-- [ ] **Red**: Write test for BATS framework module stub
+- [x] **Red**: Write test for BATS framework module stub
   - Test: Module can be registered as framework type
   - Test: Module implements framework-specific methods
   - Test: Module metadata includes `module_type=framework`
-- [ ] **Green**: Create `mod/frameworks/bats/mod.sh` with framework implementations
-- [ ] **Refactor**: Ensure consistent framework module structure
+- [x] **Green**: Create `mod/frameworks/bats/mod.sh` with framework implementations
+- [x] **Refactor**: Ensure consistent framework module structure
 
 **1.2.9 Project Module Support**
 *Add support for project modules that can override default behavior for specific projects.*
