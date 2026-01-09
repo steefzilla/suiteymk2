@@ -436,3 +436,84 @@ data_get_multiline() {
     data_get "$data" "$key"
     return $?
 }
+
+# Validate that a string conforms to the data format specification
+# Usage: data_validate <data>
+# Exit code: 0 if valid data format, 1 if invalid
+# Behavior: Validates each line against allowed patterns (key=value, comments, sections, heredoc)
+data_validate() {
+    local data="$1"
+
+    # Empty input is considered valid
+    if [[ -z "$data" ]]; then
+        return 0
+    fi
+
+    # Validate each line
+    local in_heredoc=false
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Skip empty lines
+        if [[ -z "${line// }" ]]; then
+            continue
+        fi
+
+        # Allow comment lines (starting with #)
+        if [[ "$line" =~ ^# ]]; then
+            continue
+        fi
+
+        # Allow section headers ([section_name])
+        if [[ "$line" =~ ^\[.*\]$ ]]; then
+            continue
+        fi
+
+        # Allow heredoc start markers (key<<EOF)
+        # Check if line contains << and doesn't start with =
+        if [[ "$line" == *"<<"* ]] && [[ "$line" != "="* ]]; then
+            in_heredoc=true
+            continue
+        fi
+
+        # Allow heredoc end markers (EOF)
+        if [[ "$line" == "EOF" ]]; then
+            in_heredoc=false
+            continue
+        fi
+
+        # Skip validation for lines inside heredoc blocks
+        if [[ "$in_heredoc" == true ]]; then
+            continue
+        fi
+
+        # Require other lines to match key=value pattern
+        if [[ ! "$line" =~ ^[^=]+= ]]; then
+            return 1
+        fi
+    done <<< "$data"
+
+    # All lines are valid
+    return 0
+}
+
+# Check if a key exists in data
+# Usage: data_has_key <data> <key>
+# Exit code: 0 if key exists, 1 if not found or invalid inputs
+# Behavior: Searches for lines starting with ${key}=
+data_has_key() {
+    local data="$1"
+    local key="$2"
+
+    # Validate inputs
+    if [[ -z "$data" ]] || [[ -z "$key" ]]; then
+        return 1
+    fi
+
+    # Search for lines starting with ${key}=
+    # Use grep to find exact match (key= at start of line)
+    if echo "$data" | grep -q "^${key}="; then
+        return 0
+    fi
+
+    # Key not found
+    return 1
+}

@@ -341,12 +341,12 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **1.1.5 Data Validation**
 *Implement functions to validate data format and check if keys exist in data strings.*
-- [ ] **Red**: Write tests for `data_validate()`, `data_has_key()`
+- [x] **Red**: Write tests for `data_validate()`, `data_has_key()`
   - Test: Validate correct data format
   - Test: Reject invalid formats
   - Test: Check key existence
-- [ ] **Green**: Implement validation functions
-- [ ] **Refactor**: Optimize validation logic
+- [x] **Green**: Implement validation functions
+- [x] **Refactor**: Optimize validation logic
 
 **Acceptance Criteria**:
 - All data access functions pass unit tests

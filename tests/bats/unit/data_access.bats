@@ -726,3 +726,188 @@ line 3"
     assert_success
     assert_output "$multiline_value"
 }
+
+# Data Validation Tests
+
+@test "data_validate() accepts empty input" {
+    run data_validate ""
+    assert_success
+}
+
+@test "data_validate() accepts valid key=value format" {
+    local data="name=suitey
+version=0.1.0
+framework=bats"
+
+    run data_validate "$data"
+    assert_success
+}
+
+@test "data_validate() accepts empty lines" {
+    local data="name=suitey
+
+version=0.1.0
+
+framework=bats"
+
+    run data_validate "$data"
+    assert_success
+}
+
+@test "data_validate() accepts comment lines" {
+    local data="# This is a comment
+name=suitey
+# Another comment
+version=0.1.0"
+
+    run data_validate "$data"
+    assert_success
+}
+
+@test "data_validate() accepts section headers" {
+    local data="[suite:unit_tests]
+name=unit
+framework=bats
+[suite:integration_tests]
+name=integration"
+
+    run data_validate "$data"
+    assert_success
+}
+
+@test "data_validate() accepts heredoc start markers" {
+    local data="name=suitey
+output<<EOF
+some content
+EOF"
+
+    run data_validate "$data"
+    assert_success
+}
+
+@test "data_validate() accepts heredoc end markers" {
+    local data="name=suitey
+output<<EOF
+some content
+EOF
+version=0.1.0"
+
+    run data_validate "$data"
+    assert_success
+}
+
+@test "data_validate() rejects lines without equals sign (except comments, sections, heredoc)" {
+    local data="name=suitey
+invalid line without equals
+version=0.1.0"
+
+    run data_validate "$data"
+    assert_failure
+}
+
+@test "data_validate() accepts empty values" {
+    local data="name=
+version=0.1.0
+empty_key="
+
+    run data_validate "$data"
+    assert_success
+}
+
+@test "data_validate() accepts values with spaces" {
+    local data="name=My Test Suite
+description=This is a description with spaces"
+
+    run data_validate "$data"
+    assert_success
+}
+
+@test "data_has_key() returns success if key exists" {
+    local data="name=suitey
+version=0.1.0
+framework=bats"
+
+    run data_has_key "$data" "name"
+    assert_success
+
+    run data_has_key "$data" "version"
+    assert_success
+
+    run data_has_key "$data" "framework"
+    assert_success
+}
+
+@test "data_has_key() returns failure if key does not exist" {
+    local data="name=suitey
+version=0.1.0"
+
+    run data_has_key "$data" "nonexistent"
+    assert_failure
+
+    run data_has_key "$data" "missing_key"
+    assert_failure
+}
+
+@test "data_has_key() handles empty input (exit code 1)" {
+    run data_has_key "" "key"
+    assert_failure
+    assert_equal "$status" 1
+
+    run data_has_key "some=data" ""
+    assert_failure
+    assert_equal "$status" 1
+}
+
+@test "data_has_key() matches exact key (not substring)" {
+    local data="name=suitey
+name_extra=value
+version=0.1.0"
+
+    run data_has_key "$data" "name"
+    assert_success
+
+    run data_has_key "$data" "name_extra"
+    assert_success
+
+    # Should not match "name" when looking for "name_extra"
+    run data_has_key "$data" "nam"
+    assert_failure
+}
+
+@test "data_has_key() handles keys with special characters" {
+    local data="test_key=value
+test-key=value2
+test.key=value3"
+
+    run data_has_key "$data" "test_key"
+    assert_success
+
+    run data_has_key "$data" "test-key"
+    assert_success
+
+    run data_has_key "$data" "test.key"
+    assert_success
+}
+
+@test "data_has_key() does not match heredoc markers" {
+    local data="name=suitey
+output<<EOF
+some content
+EOF"
+
+    # Should not match "output" when it's a heredoc marker
+    run data_has_key "$data" "output"
+    assert_failure
+}
+
+@test "data_has_key() matches regular key=value even if heredoc exists" {
+    local data="name=suitey
+output=regular value
+output<<EOF
+heredoc content
+EOF"
+
+    # Should match the regular key=value entry
+    run data_has_key "$data" "output"
+    assert_success
+}
