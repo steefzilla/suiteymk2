@@ -475,6 +475,23 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 #### TDD Steps:
 
+**2.1.0 Example Projects Creation**
+*Create example test projects to validate platform detection and provide integration test cases.*
+- [x] **Create Rust example project** (`./example/rust-project/`)
+  - `Cargo.toml` with basic package configuration
+  - `src/lib.rs` with library code and unit tests
+  - `tests/integration_test.rs` with integration tests
+  - `README.md` with project documentation
+- [x] **Create BATS example project** (`./example/bats-project/`)
+  - `tests/bats/basic_tests.bats` with fundamental BATS tests
+  - `tests/bats/advanced_tests.bats` with complex BATS scenarios
+  - `tests/unit/shell_tests.sh` with shell script examples
+  - `README.md` with project documentation
+- [x] **Validate platform detection** on example projects
+  - Rust project detected as "rust project (high confidence)"
+  - BATS project detected as "bash project (high confidence)"
+  - Both show correct framework information
+
 **2.1.1 Basic Detection**
 *Implement detect_platforms() to identify programming languages/frameworks present in a project using module detection.*
 - [x] **Red**: Write test `tests/bats/unit/platform_detector.bats` for platform detection

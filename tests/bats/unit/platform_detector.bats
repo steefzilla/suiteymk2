@@ -36,41 +36,33 @@ teardown() {
 
 @test "detect_platforms() detects Rust project with Cargo.toml" {
     # Register Rust module
-    if [[ -f "mod/languages/rust/mod.sh" ]]; then
+    if [[ -f "mod/languages/rust/mod.sh" ]] && [[ -d "example/rust-project" ]]; then
         source "mod/languages/rust/mod.sh"
         register_module "rust-module" "rust-module"
-        
-        # Create a temporary directory with Cargo.toml
-        local test_dir
-        test_dir=$(mktemp -d)
-        echo "name = \"test\"" > "$test_dir/Cargo.toml"
-        
+
+        # Use the real Rust example project
+        local test_dir="example/rust-project"
+
         # Run detect_platforms()
         run detect_platforms "$test_dir"
         assert_success
-        
+
         # Should detect Rust platform
         assert_output --partial "platforms_count=1"
         assert_output --partial "platforms_0_language=rust"
-        
-        # Cleanup
-        rm -rf "$test_dir"
     else
-        skip "Rust module not found"
+        skip "Rust module or example project not found"
     fi
 }
 
 @test "detect_platforms() detects Bash/BATS project with .bats files" {
     # Register Bash module
-    if [[ -f "mod/languages/bash/mod.sh" ]]; then
+    if [[ -f "mod/languages/bash/mod.sh" ]] && [[ -d "example/bats-project" ]]; then
         source "mod/languages/bash/mod.sh"
         register_module "bash-module" "bash-module"
-        
-        # Create a temporary directory with .bats file
-        local test_dir
-        test_dir=$(mktemp -d)
-        mkdir -p "$test_dir/tests/bats"
-        echo "#!/usr/bin/env bats" > "$test_dir/tests/bats/test.bats"
+
+        # Use the real BATS example project
+        local test_dir="example/bats-project"
         
         # Run detect_platforms()
         run detect_platforms "$test_dir"
@@ -79,11 +71,8 @@ teardown() {
         # Should detect Bash platform
         assert_output --partial "platforms_count=1"
         assert_output --partial "platforms_0_language=bash"
-        
-        # Cleanup
-        rm -rf "$test_dir"
     else
-        skip "Bash module not found"
+        skip "Bash module or example project not found"
     fi
 }
 
