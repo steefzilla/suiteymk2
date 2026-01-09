@@ -184,6 +184,12 @@ detect_platforms() {
                 confidence=$(echo "$detection_result" | grep "^confidence=" | cut -d'=' -f2 || echo "low")
             fi
 
+            # Validate required metadata for detected platforms
+            if [[ -z "$language" ]]; then
+                echo "Warning: Module '$module_id' detected platform but did not specify language. Skipping platform." >&2
+                continue
+            fi
+
             # Add platform to results
             if [[ -n "$results" ]]; then
                 results="${results}"$'\n'"platforms_${platform_index}_language=${language}"

@@ -143,8 +143,13 @@ All Suitey Modules must implement a consistent interface that defines the contra
     - `indicators_0=...` - List of indicators that led to detection
     - `indicators_1=...`
     - `indicators_count=N`
-    - `language=rust/bash/etc` - Detected language
-    - `frameworks_0=cargo/bats/etc` - Supported frameworks for this language
+    - `language=rust/bash/etc` - **REQUIRED** when `detected=true`: Detected language
+    - `frameworks_0=cargo/bats/etc` - **REQUIRED** when `detected=true`: Supported frameworks for this language
+
+**Validation Requirements:**
+- When `detected=true`, modules MUST provide `language` and `frameworks_0` fields
+- If a module cannot determine the specific language/framework, it should return `detected=false`
+- Invalid detection results (detected=true without required metadata) will be logged as warnings and skipped
 
 - **`check_container_environment(project_root: string) -> ContainerStatus`**
   - Verifies that the container environment is ready for test execution

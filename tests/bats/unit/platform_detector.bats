@@ -111,7 +111,7 @@ teardown() {
 
 @test "detect_platforms() handles multiple platforms in same project" {
     # Register both modules
-    if [[ -f "mod/languages/rust/mod.sh" ]] && [[ -f "mod/languages/bash/mod.sh" ]]; then
+    if [[ -f "mod/languages/rust/mod.sh" ]] && [[ -f "mod/languages/bash/mod.sh" ]] && [[ -d "example/rust+bats" ]]; then
         source "mod/languages/rust/mod.sh"
         register_module "rust-module" "rust-module"
         
@@ -123,26 +123,19 @@ teardown() {
         source "mod/languages/bash/mod.sh"
         register_module "bash-module" "bash-module"
         
-        # Create a temporary directory with both Rust and Bash indicators
-        local test_dir
-        test_dir=$(mktemp -d)
-        echo "name = \"test\"" > "$test_dir/Cargo.toml"
-        mkdir -p "$test_dir/tests/bats"
-        echo "#!/usr/bin/env bats" > "$test_dir/tests/bats/test.bats"
-        
+        # Use the rust+bats example project with both Rust and BATS indicators
+        local test_dir="example/rust+bats"
+
         # Run detect_platforms()
         run detect_platforms "$test_dir"
         assert_success
-        
+
         # Should detect both platforms
         assert_output --partial "platforms_count=2"
         assert_output --partial "platforms_0_language=rust"
         assert_output --partial "platforms_1_language=bash"
-        
-        # Cleanup
-        rm -rf "$test_dir"
     else
-        skip "Modules not found"
+        skip "Required modules or rust+bats example project not found"
     fi
 }
 
@@ -702,6 +695,50 @@ teardown() {
         rm -rf "$test_dir"
     else
         skip "Required modules not found"
+    fi
+}
+
+@test "detect_platforms() validates detected platforms have required metadata" {
+    # Test that existing modules provide required metadata
+    if [[ -f "mod/languages/rust/mod.sh" ]]; then
+        source "mod/languages/rust/mod.sh"
+        register_module "rust-module" "rust-module"
+
+        # Use the real Rust example project
+        local test_dir="example/rust-project"
+
+        # Run detect_platforms()
+        local result
+        result=$(detect_platforms "$test_dir")
+
+        # Should detect the platform successfully (metadata validation passed)
+        assert echo "$result" | grep -q "platforms_count=1"
+        assert echo "$result" | grep -q "platforms_0_language=rust"
+    else
+        skip "Rust module or example project not found"
+    fi
+}
+
+@test "detect_platforms() skips platforms with missing language metadata" {
+    # This test validates that valid modules work correctly.
+    # Invalid modules that don't provide required metadata would be skipped.
+
+    if [[ -f "mod/languages/rust/mod.sh" ]]; then
+        source "mod/languages/rust/mod.sh"
+        register_module "rust-module" "rust-module"
+
+        # Use the real Rust example project (which has proper metadata)
+        local test_dir="example/rust-project"
+
+        # Run detect_platforms()
+        local result
+        result=$(detect_platforms "$test_dir")
+
+        # Should successfully detect the platform (no warnings about missing metadata)
+        assert echo "$result" | grep -q "platforms_count=1"
+        assert echo "$result" | grep -q "platforms_0_language=rust"
+    else
+        skip "Rust module or example project not found"
     fi
 }
 

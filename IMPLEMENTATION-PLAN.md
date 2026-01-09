@@ -487,31 +487,38 @@ This requirement applies to all phases and ensures code quality and test coverag
   - `tests/bats/advanced_tests.bats` with complex BATS scenarios
   - `tests/unit/shell_tests.sh` with shell script examples
   - `README.md` with project documentation
+- [x] **Create rust+bats example project** (`./example/rust+bats/`)
+  - Contains both Rust (`Cargo.toml`) and BATS (`.bats` files) indicators
+  - Tests detection of multiple platforms in a single project
+  - `README.md` with project documentation
 - [x] **Validate platform detection** on example projects
   - Rust project detected as "rust project (high confidence)"
   - BATS project detected as "bash project (high confidence)"
-  - Both show correct framework information
+  - Combined project detects both platforms
 
 **2.1.1 Basic Detection**
 *Implement detect_platforms() to identify programming languages/frameworks present in a project using module detection.*
 - [x] **Red**: Write test `tests/bats/unit/platform_detector.bats` for platform detection
-  - Test: Detect Rust project (presence of `Cargo.toml`)
-  - Test: Detect Bash/BATS project (presence of `.bats` files)
+  - Test: Detect Rust project using `./example/rust-project/` (Cargo.toml)
+  - Test: Detect Bash/BATS project using `./example/bats-project/` (.bats files)
   - Test: Return empty list for project with no detected platforms
-  - Test: Handle multiple platforms in same project
+  - Test: Handle multiple platforms in same project using `./example/rust+bats/`
+  - **Test: Validate detected platforms have required language/framework metadata**
 - [x] **Green**: Implement `detect_platforms()` in `src/platform_detector.sh`
   - Use Modules Registry to get available modules
   - Call each module's `detect()` method
+  - **Validate that detected platforms provide required metadata (language, framework)**
+  - **Handle invalid detections gracefully (log warning, skip platform)**
   - Aggregate results
 - [x] **Refactor**: Improve error handling, optimize detection order
 
 **2.1.2 Container Environment Verification**
 *Verify that Docker/container environment is properly configured for test execution, skip with warning if containers cannot be used.*
 - [x] **Red**: Write tests for container environment verification
-  - Test: Verify Docker daemon is running and accessible
-  - Test: Verify basic container operations work (create, run, remove)
-  - Test: Handle Docker unavailability gracefully (skip with warning)
-  - Test: Check network connectivity for image pulls
+  - Test: Verify Docker daemon is running and accessible using example projects
+  - Test: Verify basic container operations work using example projects
+  - Test: Handle Docker unavailability gracefully (skip with warning) using example projects
+  - Test: Check network connectivity for image pulls using example projects
 - [x] **Green**: Implement container environment checking
   - Check Docker daemon status
   - Verify basic container operations
@@ -522,18 +529,18 @@ This requirement applies to all phases and ensures code quality and test coverag
 **2.1.3 Detection Confidence Levels**
 *Calculate confidence levels (high/medium/low) based on presence of config files, test files, and file extensions.*
 - [x] **Red**: Write tests for confidence levels
-  - Test: High confidence when config file + test files present
-  - Test: Medium confidence when only test files present
-  - Test: Low confidence when only file extensions present
+  - Test: High confidence using `./example/rust-project/` (Cargo.toml + test files)
+  - Test: Medium confidence using `./example/bats-project/` test directory structure
+  - Test: Low confidence when only file extensions present (temporary test scenarios)
 - [x] **Green**: Implement confidence level calculation in modules
 - [x] **Refactor**: Refine confidence heuristics
 
 **2.1.4 Integration with Modules Registry**
 *Integrate Platform Detector with Modules Registry to use registered modules for platform detection.*
 - [x] **Red**: Write integration test
-  - Test: Platform Detector uses Modules Registry to get modules
-  - Test: Detection results include module metadata
-  - Test: Handle registry errors gracefully
+  - Test: Platform Detector uses Modules Registry to get modules using example projects
+  - Test: Detection results include module metadata using example projects
+  - Test: Handle registry errors gracefully using example projects
 - [x] **Green**: Integrate Platform Detector with Modules Registry
 - [x] **Refactor**: Improve integration, error handling
 
@@ -555,9 +562,9 @@ This requirement applies to all phases and ensures code quality and test coverag
 **2.2.1 Basic Test File Discovery**
 *Implement discover_test_suites() to find and list test files for detected platforms using module discovery methods.*
 - [ ] **Red**: Write test `tests/bats/unit/test_suite_detector.bats` for test discovery
-  - Test: Discover Rust unit tests in `src/` directory
-  - Test: Discover Rust integration tests in `tests/` directory
-  - Test: Discover BATS test files (`.bats` files)
+  - Test: Discover Rust unit tests in `./example/rust-project/src/` directory
+  - Test: Discover Rust integration tests in `./example/rust-project/tests/` directory
+  - Test: Discover BATS test files in `./example/bats-project/tests/bats/` directory
   - Test: Return empty list when no tests found
 - [ ] **Green**: Implement `discover_test_suites()` in `src/test_suite_detector.sh`
   - Use Modules Registry to get modules for detected platforms
@@ -567,17 +574,17 @@ This requirement applies to all phases and ensures code quality and test coverag
 **2.2.2 Suite Grouping**
 *Group discovered test files into distinct test suites (e.g., one suite per BATS file, unit vs integration for Rust).*
 - [ ] **Red**: Write tests for suite grouping
-  - Test: Group BATS files by file (one suite per file)
-  - Test: Group Rust tests by type (unit vs integration)
-  - Test: Handle multiple test suites per platform
+  - Test: Group BATS files by file using `./example/bats-project/tests/bats/` (one suite per file)
+  - Test: Group Rust tests by type using `./example/rust-project/` (unit vs integration)
+  - Test: Handle multiple test suites per platform using example projects
 - [ ] **Green**: Implement suite grouping logic
 - [ ] **Refactor**: Improve grouping strategies
 
 **2.2.3 Test Counting**
 *Count individual tests in test files (e.g., @test annotations in BATS, #[test] functions in Rust) using module parsing.*
 - [ ] **Red**: Write tests for test counting
-  - Test: Count `@test` annotations in BATS files
-  - Test: Count `#[test]` functions in Rust files
+  - Test: Count `@test` annotations in `./example/bats-project/tests/bats/` files
+  - Test: Count `#[test]` functions in `./example/rust-project/src/lib.rs` and `./example/rust-project/tests/`
   - Test: Handle files with no tests
 - [ ] **Green**: Implement test counting using module's parsing logic
 - [ ] **Refactor**: Optimize counting, handle edge cases
@@ -585,8 +592,8 @@ This requirement applies to all phases and ensures code quality and test coverag
 **2.2.4 Integration with Platform Detector**
 *Integrate Test Suite Detector with Platform Detector to only discover tests for detected platforms.*
 - [ ] **Red**: Write integration test
-  - Test: Test Suite Detector uses Platform Detector results
-  - Test: Only detects tests for detected platforms
+  - Test: Test Suite Detector uses Platform Detector results on example projects
+  - Test: Only detects tests for detected platforms using `./example/rust-project/` and `./example/bats-project/`
   - Test: Handles platform detection failures gracefully
 - [ ] **Green**: Integrate Test Suite Detector with Platform Detector
 - [ ] **Refactor**: Improve integration, error handling
@@ -608,8 +615,8 @@ This requirement applies to all phases and ensures code quality and test coverag
 **2.3.1 Build Requirement Detection**
 *Implement detect_build_requirements() to determine if projects need building before testing using module detection.*
 - [ ] **Red**: Write test `tests/bats/unit/build_system_detector.bats` for build detection
-  - Test: Detect Rust requires build (`Cargo.toml` present)
-  - Test: Detect BATS does not require build
+  - Test: Detect Rust requires build using `./example/rust-project/` (`Cargo.toml` present)
+  - Test: Detect BATS does not require build using `./example/bats-project/`
   - Test: Detect Make-based builds (`Makefile` present)
   - Test: Return `requires_build=false` when no build needed
 - [ ] **Green**: Implement `detect_build_requirements()` in `src/build_system_detector.sh`
@@ -620,9 +627,9 @@ This requirement applies to all phases and ensures code quality and test coverag
 **2.3.2 Build Step Identification**
 *Identify build commands (e.g., cargo build, make targets) required for each platform using module get_build_steps().*
 - [ ] **Red**: Write tests for build step identification
-  - Test: Identify `cargo build` for Rust projects
+  - Test: Identify `cargo build` for Rust projects using `./example/rust-project/`
   - Test: Identify build commands from `Makefile`
-  - Test: Return empty build steps when no build required
+  - Test: Return empty build steps when no build required using `./example/bats-project/`
 - [ ] **Green**: Implement build step identification using module's `get_build_steps()` method
 - [ ] **Refactor**: Improve step identification
 
@@ -652,10 +659,10 @@ This requirement applies to all phases and ensures code quality and test coverag
 **2.4.1 Orchestration Workflow**
 *Implement scan_project() to coordinate Platform Detection, Test Suite Detection, and Build System Detection in order.*
 - [ ] **Red**: Write test `tests/bats/unit/project_scanner.bats` for orchestration
-  - Test: Calls Platform Detector first
-  - Test: Calls Test Suite Detector after Platform Detection
-  - Test: Calls Build System Detector after Platform Detection
-  - Test: Aggregates results from all detectors
+  - Test: Calls Platform Detector first on example projects
+  - Test: Calls Test Suite Detector after Platform Detection on example projects
+  - Test: Calls Build System Detector after Platform Detection on example projects
+  - Test: Aggregates results from all detectors using example projects
 - [ ] **Green**: Implement `scan_project()` in `src/project_scanner.sh`
   - Orchestrate detection phases in correct order
   - Aggregate results
@@ -664,19 +671,19 @@ This requirement applies to all phases and ensures code quality and test coverag
 **2.4.2 Result Aggregation**
 *Combine results from all detection phases (platforms, test suites, build requirements) into unified data structure.*
 - [ ] **Red**: Write tests for result aggregation
-  - Test: Combine platform detection results
-  - Test: Combine test suite results
-  - Test: Combine build requirement results
-  - Test: Handle partial failures (some detectors fail)
+  - Test: Combine platform detection results from example projects
+  - Test: Combine test suite results from example projects
+  - Test: Combine build requirement results from example projects
+  - Test: Handle partial failures (some detectors fail) using example projects
 - [ ] **Green**: Implement result aggregation
 - [ ] **Refactor**: Improve aggregation logic
 
 **2.4.3 Error Handling**
 *Handle detection failures gracefully, continue with other detectors when one fails, and provide clear error messages.*
 - [ ] **Red**: Write tests for error handling
-  - Test: Handle Platform Detector failures gracefully
-  - Test: Continue with other detectors when one fails
-  - Test: Provide clear error messages
+  - Test: Handle Platform Detector failures gracefully using example projects
+  - Test: Continue with other detectors when one fails using example projects
+  - Test: Provide clear error messages using example projects
 - [ ] **Green**: Implement error handling
 - [ ] **Refactor**: Improve error messages, recovery
 
@@ -709,8 +716,8 @@ This requirement applies to all phases and ensures code quality and test coverag
 **3.1.1 Docker Container Management**
 *Implement container lifecycle management: launch build containers with correct mounts, track containers, and clean up on completion.*
 - [ ] **Red**: Write test `tests/bats/unit/build_manager.bats` (with Docker mocking)
-  - Test: Launch build container with correct configuration
-  - Test: Mount project directory read-only
+  - Test: Launch build container with correct configuration using `./example/rust-project/`
+  - Test: Mount project directory read-only using example projects
   - Test: Mount `/tmp` artifact directory read-write
   - Test: Clean up containers on completion
 - [ ] **Green**: Implement container management in `src/build_manager.sh`
@@ -719,7 +726,7 @@ This requirement applies to all phases and ensures code quality and test coverag
 **3.1.2 Build Execution**
 *Execute build commands in Docker containers, capture output and exit codes, and track build duration.*
 - [ ] **Red**: Write tests for build execution
-  - Test: Execute build command in container
+  - Test: Execute `cargo build` in container using `./example/rust-project/`
   - Test: Capture build output (stdout/stderr)
   - Test: Detect build failures (non-zero exit code)
   - Test: Track build duration
@@ -738,11 +745,11 @@ This requirement applies to all phases and ensures code quality and test coverag
 **3.1.4 Test Image Creation**
 *Generate Dockerfiles and build Docker images containing build artifacts, source code, and test suites for test execution.*
 - [ ] **Red**: Write tests for test image creation
-  - Test: Generate Dockerfile for test image
-  - Test: Build Docker image with artifacts
-  - Test: Verify image contains build artifacts
-  - Test: Verify image contains source code
-  - Test: Verify image contains test suites
+  - Test: Generate Dockerfile for test image using `./example/rust-project/`
+  - Test: Build Docker image with artifacts from `./example/rust-project/`
+  - Test: Verify image contains build artifacts from `./example/rust-project/`
+  - Test: Verify image contains source code from `./example/rust-project/`
+  - Test: Verify image contains test suites from `./example/rust-project/`
 - [ ] **Green**: Implement test image creation
 - [ ] **Refactor**: Optimize Dockerfile generation, image building
 
@@ -758,7 +765,7 @@ This requirement applies to all phases and ensures code quality and test coverag
 **3.1.6 Integration Test with Real Docker**
 *Verify build manager works with real Docker: builds projects, creates test images, and verifies artifacts are present.*
 - [ ] **Red**: Write integration test `tests/bats/integration/build_manager.bats`
-  - Test: Build simple Rust project
+  - Test: Build `./example/rust-project/` Rust project
   - Test: Create test image successfully
   - Test: Verify artifacts in test image
 - [ ] **Green**: Ensure real Docker operations work
@@ -781,19 +788,19 @@ This requirement applies to all phases and ensures code quality and test coverag
 **3.2.1 Test Container Execution**
 *Launch test containers with pre-built images, execute test commands, and capture test output and exit codes.*
 - [ ] **Red**: Write test `tests/bats/unit/execution_system.bats` (with Docker mocking)
-  - Test: Launch test container with pre-built image
-  - Test: Execute test command in container
-  - Test: Capture test output
-  - Test: Capture exit code
+  - Test: Launch test container with pre-built image using `./example/rust-project/`
+  - Test: Execute `cargo test` in container using `./example/rust-project/`
+  - Test: Capture test output from `./example/rust-project/`
+  - Test: Capture exit code from `./example/rust-project/` tests
 - [ ] **Green**: Implement test execution in `src/execution_system.sh`
 - [ ] **Refactor**: Improve container management
 
 **3.2.2 Result Collection**
 *Collect test results (exit codes, stdout/stderr, duration) from containers and write structured results to /tmp.*
 - [ ] **Red**: Write tests for result collection
-  - Test: Collect exit code from test container
-  - Test: Collect test output (stdout/stderr)
-  - Test: Calculate execution duration
+  - Test: Collect exit code from test container using `./example/rust-project/`
+  - Test: Collect test output (stdout/stderr) from `./example/rust-project/`
+  - Test: Calculate execution duration for `./example/rust-project/`
   - Test: Write results to `/tmp` in structured format
 - [ ] **Green**: Implement result collection
 - [ ] **Refactor**: Optimize result storage
@@ -801,8 +808,8 @@ This requirement applies to all phases and ensures code quality and test coverag
 **3.2.3 Result Parsing**
 *Parse test output to extract test counts and individual test results using module parse_test_results() methods.*
 - [ ] **Red**: Write tests for result parsing
-  - Test: Parse test counts from Rust output
-  - Test: Parse test counts from BATS output
+  - Test: Parse test counts from `./example/rust-project/` cargo test output
+  - Test: Parse test counts from `./example/bats-project/` bats output
   - Test: Extract individual test results (if parseable)
   - Test: Handle unparseable output gracefully
 - [ ] **Green**: Implement parsing using module's `parse_test_results()` method
@@ -811,18 +818,18 @@ This requirement applies to all phases and ensures code quality and test coverag
 **3.2.4 Integration with Modules Registry**
 *Use module execution and parsing methods from Modules Registry, handling missing modules gracefully.*
 - [ ] **Red**: Write tests for module integration
-  - Test: Use module's execution method
-  - Test: Use module's parsing method
-  - Test: Handle missing modules gracefully
+  - Test: Use module's execution method on example projects
+  - Test: Use module's parsing method on example projects
+  - Test: Handle missing modules gracefully using example projects
 - [ ] **Green**: Integrate with Modules Registry
 - [ ] **Refactor**: Improve integration
 
 **3.2.5 Integration Test with Real Docker**
 *Verify execution system works with real Docker: executes Rust and BATS tests in containers and collects results correctly.*
 - [ ] **Red**: Write integration test `tests/bats/integration/execution_system.bats`
-  - Test: Execute Rust tests in container
-  - Test: Execute BATS tests in container
-  - Test: Verify results are collected correctly
+  - Test: Execute `./example/rust-project/` tests in container
+  - Test: Execute `./example/bats-project/` tests in container
+  - Test: Verify results are collected correctly from both projects
 - [ ] **Green**: Ensure real Docker operations work
 - [ ] **Refactor**: Optimize execution performance
 
@@ -1026,7 +1033,8 @@ This requirement applies to all phases and ensures code quality and test coverag
 **5.1.2 Workflow Orchestration**
 *Orchestrate complete workflow: initialize, scan project, build (if needed), execute tests, display results, and generate report.*
 - [ ] **Red**: Write integration test for full workflow
-  - Test: Run `suitey.sh [DIRECTORY]` on project directory (directory argument from Phase 0.3.6)
+  - Test: Run `suitey.sh ./example/rust-project/` on Rust project
+  - Test: Run `suitey.sh ./example/bats-project/` on BATS project
   - Test: Execute complete workflow (init → discovery → build → execution)
   - Test: Display results correctly
   - Test: Generate report

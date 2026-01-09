@@ -130,8 +130,8 @@ discover_source_files() {
     fi
 
     # Find all .sh files in src/ directory, sorted for consistency
-    # Exclude hidden files and directories
-    find "src" -name "*.sh" -type f -not -path "*/.*" | sort
+    # Exclude hidden files and directories, and test files
+    find "src" -name "*.sh" -type f -not -path "*/.*" -not -name "test_source_*.sh" | sort
 }
 
 # Discover all module files in mod/ directory

@@ -150,6 +150,9 @@ test_function() {
 }
 EOF
 
+    # Ensure cleanup happens even if test fails
+    trap "rm -f '$test_source_file'" EXIT
+
     # Build with the additional source file
     run ./build.sh --output "$output_file"
     assert_success
@@ -160,6 +163,7 @@ EOF
 
     # Clean up test source file
     rm -f "$test_source_file"
+    trap - EXIT
 }
 
 @test "Integration: Build process validates output correctly" {
