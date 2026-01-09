@@ -14,6 +14,7 @@ DEFAULT_OUTPUT="suitey.sh"
 # Build options
 VERBOSE_MODE=false
 CLEAN_MODE=false
+MINIFY_MODE=false
 BUNDLE_VERSION="$SCRIPT_VERSION"
 OUTPUT_NAME=""
 
@@ -34,6 +35,7 @@ OPTIONS:
     --version VER       Set version to include in bundle (default: ${SCRIPT_VERSION})
     --clean             Clean output file before building
     --verbose           Show detailed build output
+    -m, --minify        Create minified version (suitey.min.sh) using gzip compression
 
 EXAMPLES:
     $0                          # Build with default settings
@@ -42,6 +44,8 @@ EXAMPLES:
     $0 --version 2.0.0          # Build with version 2.0.0 in bundle
     $0 --clean                  # Clean existing output before building
     $0 --verbose                # Show detailed build progress
+    $0 --minify                 # Create minified version (suitey.min.sh)
+    $0 -m                       # Same as --minify (create minified version)
     $0 --help                   # Show this help message
 
 EOF
@@ -888,6 +892,88 @@ clean_output_file() {
     fi
 }
 
+# Minify shell script content by removing comments, whitespace, etc.
+minify_shell_script() {
+    local input_file="$1"
+
+    # Read the file and process it line by line
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Skip empty lines
+        [[ -z "$line" ]] && continue
+
+        # Preserve shebang line
+        if [[ "$line" =~ ^#!/ ]]; then
+            echo "$line"
+            continue
+        fi
+
+        # Remove full-line comments (lines starting with #)
+        if [[ "$line" =~ ^[[:space:]]*# ]]; then
+            continue
+        fi
+
+        # Strip comments from the line
+        line="${line#"${line%%[![:space:]]*}"}"
+
+        # Remove trailing whitespace
+        line="${line%"${line##*[![:space:]]}"}"
+
+        # Skip empty lines after trimming
+        [[ -z "$line" ]] && continue
+
+        echo "$line"
+    done < "$input_file"
+}
+
+# Create a minified version of suitey.sh using gzip compression
+create_minified_version() {
+    local input_file="$1"
+    local minified_file="suitey.min.sh"
+
+    log "Creating minified version: $minified_file"
+
+    # Check if input file exists
+    if [[ ! -f "$input_file" ]]; then
+        error "Input file does not exist: $input_file"
+    fi
+
+    # Check if required commands are available
+    if ! command -v base64 >/dev/null 2>&1; then
+        error "base64 command not found. Required for minification."
+    fi
+    if ! command -v xz >/dev/null 2>&1; then
+        error "xz command not found. Required for minification."
+    fi
+
+    # Minify the input file to reduce size before compression
+    local minified_content
+    minified_content=$(minify_shell_script "$input_file")
+
+    # Create base64-encoded xz payload from minified content
+    local payload
+    payload=$(echo "$minified_content" | xz -c | base64 -w 0)
+
+    # Create the minified version
+    cat > "$minified_file" << EOF
+#!/usr/bin/env bash
+echo "Unpacking Suitey" >&2
+eval "\$(echo '$payload' | base64 -d | xz -dc)"
+exit \$?
+EOF
+
+    # Make the minified file executable
+    chmod +x "$minified_file"
+
+    log "Minified version created successfully: $minified_file"
+    local original_size=$(stat -c%s "$input_file" 2>/dev/null || stat -f%z "$input_file" 2>/dev/null || echo "unknown")
+    local minified_size=$(stat -c%s "$minified_file" 2>/dev/null || stat -f%z "$minified_file" 2>/dev/null || echo "unknown")
+
+    if [[ "$original_size" != "unknown" && "$minified_size" != "unknown" ]]; then
+        local ratio=$(( minified_size * 100 / original_size ))
+        log "Compression ratio: ${ratio}% (${original_size} -> ${minified_size} bytes)"
+    fi
+}
+
 # Parse command line arguments
 main() {
     local output_file="$DEFAULT_OUTPUT"
@@ -959,6 +1045,10 @@ main() {
                 CLEAN_MODE=true
                 shift
                 ;;
+            -m|--minify)
+                MINIFY_MODE=true
+                shift
+                ;;
             --verbose)
                 VERBOSE_MODE=true
                 shift
@@ -991,6 +1081,11 @@ main() {
 
     # Perform the build
     build_suitey "$output_file"
+
+    # Create minified version if requested
+    if [[ "$MINIFY_MODE" == "true" ]]; then
+        create_minified_version "$output_file"
+    fi
 
     # Clean up artifacts
     cleanup_build_artifacts
