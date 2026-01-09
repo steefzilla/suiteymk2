@@ -22,8 +22,10 @@ readonly REQUIRED_METHODS=(
 
 # Reset the registry (for testing)
 reset_registry() {
-    MODULE_REGISTRY=()
-    MODULE_METADATA=()
+    # Clear arrays (use -g to ensure we're modifying global arrays)
+    unset MODULE_REGISTRY MODULE_METADATA
+    declare -gA MODULE_REGISTRY
+    declare -gA MODULE_METADATA
 }
 
 # Validate that a module implements all required interface methods
@@ -163,9 +165,91 @@ get_module_metadata() {
 # Usage: get_all_modules
 # Returns: List of module identifiers, one per line
 get_all_modules() {
+    # Ensure arrays are initialized
+    if [[ -z "${MODULE_REGISTRY[*]}" ]]; then
+        return 0
+    fi
+
     local identifier
     for identifier in "${!MODULE_REGISTRY[@]}"; do
         echo "$identifier"
     done
+}
+
+# Get modules by capability
+# Usage: get_modules_by_capability <capability>
+# Returns: List of module identifiers that have the specified capability, one per line
+get_modules_by_capability() {
+    local capability="$1"
+
+    if [[ -z "$capability" ]]; then
+        return 0
+    fi
+
+    local identifier
+    local modules=""
+    for identifier in "${!MODULE_REGISTRY[@]}"; do
+        # Get module metadata
+        local metadata="${MODULE_METADATA[$identifier]}"
+        
+        if [[ -z "$metadata" ]]; then
+            continue
+        fi
+
+        # Check if metadata contains the capability
+        # Capabilities are stored as capabilities_0=..., capabilities_1=..., etc.
+        # Use grep to check for capability in metadata
+        if echo "$metadata" | grep -q "^capabilities_[0-9]*=${capability}$"; then
+            if [[ -z "$modules" ]]; then
+                modules="$identifier"
+            else
+                modules="${modules}"$'\n'"${identifier}"
+            fi
+        fi
+    done
+
+    if [[ -n "$modules" ]]; then
+        echo "$modules"
+    fi
+
+    return 0
+}
+
+# Get all registered capabilities
+# Usage: get_capabilities
+# Returns: List of all capabilities from all modules, one per line (deduplicated)
+get_capabilities() {
+    local identifier
+    local all_capabilities=""
+    
+    for identifier in "${!MODULE_REGISTRY[@]}"; do
+        # Get module metadata
+        local metadata="${MODULE_METADATA[$identifier]}"
+        
+        if [[ -z "$metadata" ]]; then
+            continue
+        fi
+
+        # Extract capabilities from metadata using grep
+        # Capabilities are stored as capabilities_0=..., capabilities_1=..., etc.
+        local capabilities
+        capabilities=$(echo "$metadata" | grep "^capabilities_[0-9]*=" | sed 's/^capabilities_[0-9]*=//')
+        
+        # Add capabilities to the list
+        if [[ -n "$capabilities" ]]; then
+            if [[ -z "$all_capabilities" ]]; then
+                all_capabilities="$capabilities"
+            else
+                all_capabilities="${all_capabilities}"$'\n'"${capabilities}"
+            fi
+        fi
+    done
+
+    # Deduplicate and sort capabilities
+    if [[ -n "$all_capabilities" ]]; then
+        echo "$all_capabilities" | sort -u
+    fi
+
+    return 0
 }
 
