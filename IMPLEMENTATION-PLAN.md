@@ -402,12 +402,12 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **1.2.5 Minimal Module Implementation (Bash)**
 *Create mod/languages/bash/mod.sh with stub implementations of detect() and get_metadata() methods.*
-- [ ] **Red**: Write test for Bash module stub
+- [x] **Red**: Write test for Bash module stub
   - Test: Module can be registered
   - Test: Module implements `detect()` method
   - Test: Module implements `get_metadata()` method
-- [ ] **Green**: Create `mod/languages/bash/mod.sh` with stub implementations
-- [ ] **Refactor**: Ensure consistent module structure
+- [x] **Green**: Create `mod/languages/bash/mod.sh` with stub implementations
+- [x] **Refactor**: Ensure consistent module structure
 
 **Acceptance Criteria**:
 - Registry can register and retrieve modules
