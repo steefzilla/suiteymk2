@@ -425,14 +425,14 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **1.2.7 Minimal Framework Module Implementation (Cargo)**
 *Create mod/frameworks/cargo/mod.sh with framework-specific implementations for Rust/Cargo.*
-- [ ] **Red**: Write test for Cargo framework module stub
+- [x] **Red**: Write test for Cargo framework module stub
   - Test: Module can be registered as framework type
   - Test: Module implements `discover_test_suites()` method
   - Test: Module implements `execute_test_suite()` method
   - Test: Module implements `parse_test_results()` method
   - Test: Module metadata includes `module_type=framework`
-- [ ] **Green**: Create `mod/frameworks/cargo/mod.sh` with framework implementations
-- [ ] **Refactor**: Ensure framework modules work with language modules
+- [x] **Green**: Create `mod/frameworks/cargo/mod.sh` with framework implementations
+- [x] **Refactor**: Ensure framework modules work with language modules
 
 **1.2.8 Minimal Framework Module Implementation (BATS)**
 *Create mod/frameworks/bats/mod.sh with framework-specific implementations for Bash/BATS.*
