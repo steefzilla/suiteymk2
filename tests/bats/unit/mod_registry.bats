@@ -689,3 +689,455 @@ get_metadata() { echo 'language=test'; }
     assert_output --partial "invalid format"
 }
 
+# Module Type Support Tests
+
+@test "register_module() accepts language module with module_type=language" {
+    local language_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=language'
+    echo 'language=rust'
+    echo 'frameworks_count=0'
+    echo 'project_type=test'
+    echo 'version=0.1.0'
+    echo 'capabilities_count=0'
+    echo 'required_binaries_count=0'
+}
+"
+
+    eval "$language_module"
+    
+    # Register the language module
+    register_module "rust-language" "rust-language"
+    local register_status=$?
+    assert_equal "$register_status" 0
+    
+    # Verify module is registered
+    run get_module "rust-language"
+    assert_success
+}
+
+@test "register_module() accepts framework module with module_type=framework" {
+    local framework_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=framework'
+    echo 'language=rust'
+    echo 'frameworks_0=cargo'
+    echo 'frameworks_count=1'
+    echo 'project_type=test'
+    echo 'version=0.1.0'
+    echo 'capabilities_count=0'
+    echo 'required_binaries_count=0'
+}
+"
+
+    eval "$framework_module"
+    
+    # Register the framework module
+    register_module "cargo-framework" "cargo-framework"
+    local register_status=$?
+    assert_equal "$register_status" 0
+    
+    # Verify module is registered
+    run get_module "cargo-framework"
+    assert_success
+}
+
+@test "register_module() accepts project module with module_type=project" {
+    local project_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=project'
+    echo 'language=rust'
+    echo 'frameworks_count=0'
+    echo 'project_type=custom'
+    echo 'version=0.1.0'
+    echo 'capabilities_count=0'
+    echo 'required_binaries_count=0'
+}
+"
+
+    eval "$project_module"
+    
+    # Register the project module
+    register_module "my-project" "my-project"
+    local register_status=$?
+    assert_equal "$register_status" 0
+    
+    # Verify module is registered
+    run get_module "my-project"
+    assert_success
+}
+
+@test "get_modules_by_type() returns language modules" {
+    # Register language module
+    local lang_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=language'
+    echo 'language=rust'
+    echo 'frameworks_count=0'
+    echo 'project_type=test'
+    echo 'version=0.1.0'
+    echo 'capabilities_count=0'
+    echo 'required_binaries_count=0'
+}
+"
+    eval "$lang_module"
+    register_module "rust-lang" "rust-lang"
+    
+    # Clean up functions
+    for method in detect check_binaries discover_test_suites detect_build_requirements get_build_steps execute_test_suite parse_test_results get_metadata; do
+        unset -f "$method" 2>/dev/null || true
+    done
+    
+    # Register framework module
+    local framework_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=framework'
+    echo 'language=rust'
+    echo 'frameworks_count=0'
+    echo 'project_type=test'
+    echo 'version=0.1.0'
+    echo 'capabilities_count=0'
+    echo 'required_binaries_count=0'
+}
+"
+    eval "$framework_module"
+    register_module "cargo-fw" "cargo-fw"
+    
+    # Get language modules
+    run get_modules_by_type "language"
+    assert_success
+    assert_output --partial "rust-lang"
+    refute_output --partial "cargo-fw"
+}
+
+@test "get_modules_by_type() returns framework modules" {
+    # Register language module
+    local lang_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=language'
+    echo 'language=rust'
+    echo 'frameworks_count=0'
+    echo 'project_type=test'
+    echo 'version=0.1.0'
+    echo 'capabilities_count=0'
+    echo 'required_binaries_count=0'
+}
+"
+    eval "$lang_module"
+    register_module "rust-lang" "rust-lang"
+    
+    # Clean up functions
+    for method in detect check_binaries discover_test_suites detect_build_requirements get_build_steps execute_test_suite parse_test_results get_metadata; do
+        unset -f "$method" 2>/dev/null || true
+    done
+    
+    # Register framework module
+    local framework_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=framework'
+    echo 'language=rust'
+    echo 'frameworks_count=0'
+    echo 'project_type=test'
+    echo 'version=0.1.0'
+    echo 'capabilities_count=0'
+    echo 'required_binaries_count=0'
+}
+"
+    eval "$framework_module"
+    register_module "cargo-fw" "cargo-fw"
+    
+    # Get framework modules
+    run get_modules_by_type "framework"
+    assert_success
+    assert_output --partial "cargo-fw"
+    refute_output --partial "rust-lang"
+}
+
+@test "get_modules_by_type() returns project modules" {
+    # Register project module
+    local project_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=project'
+    echo 'language=rust'
+    echo 'frameworks_count=0'
+    echo 'project_type=test'
+    echo 'version=0.1.0'
+    echo 'capabilities_count=0'
+    echo 'required_binaries_count=0'
+}
+"
+    eval "$project_module"
+    register_module "my-project" "my-project"
+    
+    # Get project modules
+    run get_modules_by_type "project"
+    assert_success
+    assert_output --partial "my-project"
+}
+
+@test "get_modules_by_type() returns empty for non-existent type" {
+    # Register a module
+    local module_content
+    module_content=$(create_test_module "test-module")
+    eval "$module_content"
+    register_module "test-module" "test-module"
+    
+    # Get modules by non-existent type
+    run get_modules_by_type "nonexistent-type"
+    assert_success
+    assert_output ""
+}
+
+@test "get_modules_by_type() handles empty type" {
+    # Register a module
+    local module_content
+    module_content=$(create_test_module "test-module")
+    eval "$module_content"
+    register_module "test-module" "test-module"
+    
+    # Get modules by empty type
+    run get_modules_by_type ""
+    assert_success
+    assert_output ""
+}
+
+@test "get_language_modules() returns language modules" {
+    # Register language module
+    local lang_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=language'
+    echo 'language=rust'
+    echo 'frameworks_count=0'
+    echo 'project_type=test'
+    echo 'version=0.1.0'
+    echo 'capabilities_count=0'
+    echo 'required_binaries_count=0'
+}
+"
+    eval "$lang_module"
+    register_module "rust-lang" "rust-lang"
+    
+    # Get language modules
+    run get_language_modules
+    assert_success
+    assert_output --partial "rust-lang"
+}
+
+@test "get_framework_modules() returns framework modules" {
+    # Register framework module
+    local framework_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=framework'
+    echo 'language=rust'
+    echo 'frameworks_count=0'
+    echo 'project_type=test'
+    echo 'version=0.1.0'
+    echo 'capabilities_count=0'
+    echo 'required_binaries_count=0'
+}
+"
+    eval "$framework_module"
+    register_module "cargo-fw" "cargo-fw"
+    
+    # Get framework modules
+    run get_framework_modules
+    assert_success
+    assert_output --partial "cargo-fw"
+}
+
+@test "get_project_modules() returns project modules" {
+    # Register project module
+    local project_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=project'
+    echo 'language=rust'
+    echo 'frameworks_count=0'
+    echo 'project_type=test'
+    echo 'version=0.1.0'
+    echo 'capabilities_count=0'
+    echo 'required_binaries_count=0'
+}
+"
+    eval "$project_module"
+    register_module "my-project" "my-project"
+    
+    # Get project modules
+    run get_project_modules
+    assert_success
+    assert_output --partial "my-project"
+}
+
+@test "module priority: project > framework > language" {
+    # This test verifies that modules can be retrieved in priority order
+    # Register modules of different types
+    local lang_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=language'
+    echo 'language=rust'
+    echo 'frameworks_count=0'
+    echo 'project_type=test'
+    echo 'version=0.1.0'
+    echo 'capabilities_count=0'
+    echo 'required_binaries_count=0'
+}
+"
+    eval "$lang_module"
+    register_module "rust-lang" "rust-lang"
+    
+    # Clean up functions
+    for method in detect check_binaries discover_test_suites detect_build_requirements get_build_steps execute_test_suite parse_test_results get_metadata; do
+        unset -f "$method" 2>/dev/null || true
+    done
+    
+    local framework_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=framework'
+    echo 'language=rust'
+    echo 'frameworks_count=0'
+    echo 'project_type=test'
+    echo 'version=0.1.0'
+    echo 'capabilities_count=0'
+    echo 'required_binaries_count=0'
+}
+"
+    eval "$framework_module"
+    register_module "cargo-fw" "cargo-fw"
+    
+    # Clean up functions
+    for method in detect check_binaries discover_test_suites detect_build_requirements get_build_steps execute_test_suite parse_test_results get_metadata; do
+        unset -f "$method" 2>/dev/null || true
+    done
+    
+    local project_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=project'
+    echo 'language=rust'
+    echo 'frameworks_count=0'
+    echo 'project_type=test'
+    echo 'version=0.1.0'
+    echo 'capabilities_count=0'
+    echo 'required_binaries_count=0'
+}
+"
+    eval "$project_module"
+    register_module "my-project" "my-project"
+    
+    # Verify all modules are registered
+    run get_all_modules
+    assert_success
+    assert_output --partial "rust-lang"
+    assert_output --partial "cargo-fw"
+    assert_output --partial "my-project"
+    
+    # Verify type-based lookup works
+    run get_modules_by_type "language"
+    assert_success
+    assert_output --partial "rust-lang"
+    
+    run get_modules_by_type "framework"
+    assert_success
+    assert_output --partial "cargo-fw"
+    
+    run get_modules_by_type "project"
+    assert_success
+    assert_output --partial "my-project"
+}
+

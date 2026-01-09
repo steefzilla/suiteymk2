@@ -170,6 +170,7 @@ parse_test_results() {
 # Usage: get_metadata
 # Returns: Module metadata as flat data
 get_metadata() {
+    echo "module_type=language"
     echo "language=rust"
     echo "frameworks_0=cargo"
     echo "frameworks_count=1"

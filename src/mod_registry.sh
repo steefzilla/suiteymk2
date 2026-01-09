@@ -56,7 +56,8 @@ validate_module_metadata() {
     fi
 
     # Check for required fields (can be lenient for now)
-    # At minimum, should have language field
+    # At minimum, should have language field (for backward compatibility)
+    # module_type is optional but recommended
     if ! echo "$metadata" | grep -q "^language="; then
         return 1
     fi
@@ -349,6 +350,72 @@ get_capabilities() {
         echo "$all_capabilities" | sort -u
     fi
 
+    return 0
+}
+
+# Get modules by type
+# Usage: get_modules_by_type <module_type>
+# Returns: List of module identifiers of the specified type, one per line
+# Module types: language, framework, project
+get_modules_by_type() {
+    local module_type="$1"
+    local identifier
+    local modules=""
+    
+    if [[ -z "$module_type" ]]; then
+        return 0
+    fi
+    
+    for identifier in "${!MODULE_REGISTRY[@]}"; do
+        # Get module metadata
+        local metadata="${MODULE_METADATA[$identifier]}"
+        
+        if [[ -z "$metadata" ]]; then
+            continue
+        fi
+
+        # Extract module_type from metadata
+        local metadata_type
+        metadata_type=$(echo "$metadata" | grep "^module_type=" | cut -d'=' -f2 || echo "")
+        
+        # Match module type (case-sensitive)
+        if [[ "$metadata_type" == "$module_type" ]]; then
+            if [[ -z "$modules" ]]; then
+                modules="$identifier"
+            else
+                modules="${modules}"$'\n'"${identifier}"
+            fi
+        fi
+    done
+
+    if [[ -n "$modules" ]]; then
+        echo "$modules"
+    fi
+
+    return 0
+}
+
+# Get language modules (convenience method)
+# Usage: get_language_modules
+# Returns: List of language module identifiers, one per line
+get_language_modules() {
+    get_modules_by_type "language"
+    return 0
+}
+
+# Get framework modules (convenience method)
+# Usage: get_framework_modules
+# Returns: List of framework module identifiers, one per line
+get_framework_modules() {
+    get_modules_by_type "framework"
+    return 0
+}
+
+# Get project modules (convenience method)
+# Usage: get_project_modules
+# Returns: List of project module identifiers, one per line
+get_project_modules() {
+    get_modules_by_type "project"
     return 0
 }
 
