@@ -10,6 +10,58 @@ if [[ -f "src/data_access.sh" ]]; then
     source "src/data_access.sh" 2>/dev/null || true
 fi
 
+# Check container environment readiness
+# Usage: check_container_environment
+# Returns: Container environment status as flat data
+# Behavior: Verifies Docker daemon accessibility, basic container operations, and network connectivity
+check_container_environment() {
+    local results=""
+
+    # Check Docker command availability
+    local docker_command_available="false"
+    if command -v docker >/dev/null 2>&1; then
+        docker_command_available="true"
+    fi
+    results="${results}docker_command_available=${docker_command_available}"$'\n'
+
+    # Check Docker daemon accessibility (only if command is available)
+    local docker_daemon_available="false"
+    if [[ "$docker_command_available" == "true" ]]; then
+        # Check if docker daemon is accessible
+        if docker info >/dev/null 2>&1; then
+            docker_daemon_available="true"
+        fi
+    fi
+    results="${results}docker_daemon_available=${docker_daemon_available}"$'\n'
+
+    # Check basic container operations (only if daemon is available)
+    local container_operations="false"
+    if [[ "$docker_daemon_available" == "true" ]]; then
+        # Try to run a simple container operation
+        if docker run --rm alpine:latest echo "test" >/dev/null 2>&1; then
+            container_operations="true"
+        fi
+    fi
+    results="${results}container_operations=${container_operations}"$'\n'
+
+    # Check network connectivity for image pulls (only if daemon is available)
+    local network_access="false"
+    if [[ "$docker_daemon_available" == "true" ]]; then
+        # Try to pull a small image to test network access
+        if docker pull alpine:latest >/dev/null 2>&1; then
+            network_access="true"
+            # Clean up the pulled image
+            docker rmi alpine:latest >/dev/null 2>&1 || true
+        fi
+    fi
+    results="${results}network_access=${network_access}"$'\n'
+
+    # Provide backward compatibility aliases
+    results="${results}docker_available=${docker_daemon_available}"$'\n'
+
+    echo "$results"
+}
+
 # Detect platforms in a project
 # Usage: detect_platforms <project_root>
 # Returns: Detection results as flat data
@@ -37,16 +89,15 @@ detect_platforms() {
     local platform_index=0
     local results=""
 
+    # Check container environment readiness
+    local container_env_status
+    container_env_status=$(check_container_environment 2>/dev/null || echo "")
+    if [[ -n "$container_env_status" ]]; then
+        results="${results}${container_env_status}"
+    fi
+
     # Process each module
     while IFS= read -r module_id || [[ -n "$module_id" ]]; do
-        # Get module name
-        local module_name
-        module_name=$(get_module "$module_id" 2>/dev/null || echo "")
-
-        if [[ -z "$module_name" ]]; then
-            continue
-        fi
-
         # Determine module file path based on module_id
         # Module IDs follow pattern: {language}-module or {framework}-module
         # Module files are at: mod/languages/{language}/mod.sh or mod/frameworks/{framework}/mod.sh

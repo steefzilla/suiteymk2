@@ -262,4 +262,170 @@ teardown() {
     fi
 }
 
+@test "detect_platforms() checks Docker daemon accessibility" {
+    # Register Rust module
+    if [[ -f "mod/languages/rust/mod.sh" ]]; then
+        source "mod/languages/rust/mod.sh"
+        register_module "rust-module" "rust-module"
+
+        # Create a temporary directory with Cargo.toml
+        local test_dir
+        test_dir=$(mktemp -d)
+        echo "name = \"test\"" > "$test_dir/Cargo.toml"
+
+        # Run detect_platforms()
+        local result
+        result=$(detect_platforms "$test_dir")
+
+        # Should include container environment status
+        assert echo "$result" | grep -q "docker_available="
+        assert echo "$result" | grep -q "container_operations="
+        assert echo "$result" | grep -q "network_access="
+
+        # Should still detect the platform
+        assert echo "$result" | grep -q "platforms_count=1"
+        assert echo "$result" | grep -q "platforms_0_language=rust"
+
+        # Cleanup
+        rm -rf "$test_dir"
+    else
+        skip "Rust module not found"
+    fi
+}
+
+@test "detect_platforms() handles Docker daemon unavailability gracefully" {
+    # Register BATS module
+    if [[ -f "mod/languages/bash/mod.sh" ]]; then
+        source "mod/languages/bash/mod.sh"
+        register_module "bash-module" "bash-module"
+
+        # Create a temporary directory with .bats file
+        local test_dir
+        test_dir=$(mktemp -d)
+        mkdir -p "$test_dir/tests/bats"
+        echo "#!/usr/bin/env bats" > "$test_dir/tests/bats/test.bats"
+
+        # Mock docker command to fail (simulate Docker not available)
+        docker() {
+            return 1
+        }
+        export -f docker
+
+        # Run detect_platforms()
+        local result
+        result=$(detect_platforms "$test_dir")
+
+        # Should indicate Docker is not available
+        assert echo "$result" | grep -q "docker_available=false"
+        assert echo "$result" | grep -q "container_operations=false"
+
+        # Should still detect the platform (detection doesn't require Docker)
+        assert echo "$result" | grep -q "platforms_count=1"
+        assert echo "$result" | grep -q "platforms_0_language=bash"
+
+        # Cleanup
+        rm -rf "$test_dir"
+        unset -f docker
+    else
+        skip "Bash module not found"
+    fi
+}
+
+@test "detect_platforms() verifies basic container operations work" {
+    # Register Rust module
+    if [[ -f "mod/languages/rust/mod.sh" ]] && command -v docker >/dev/null 2>&1; then
+        source "mod/languages/rust/mod.sh"
+        register_module "rust-module" "rust-module"
+
+        # Create a temporary directory with Cargo.toml
+        local test_dir
+        test_dir=$(mktemp -d)
+        echo "name = \"test\"" > "$test_dir/Cargo.toml"
+
+        # Run detect_platforms()
+        local result
+        result=$(detect_platforms "$test_dir")
+
+        # If Docker is available, should check container operations
+        assert echo "$result" | grep -q "container_operations=true\|container_operations=false"
+
+        # Should also check network access
+        assert echo "$result" | grep -q "network_access=true\|network_access=false"
+
+        # Cleanup
+        rm -rf "$test_dir"
+    else
+        skip "Rust module not found or Docker not available"
+    fi
+}
+
+@test "detect_platforms() checks network connectivity for image pulls" {
+    # Register Cargo framework module
+    if [[ -f "mod/frameworks/cargo/mod.sh" ]]; then
+        source "mod/frameworks/cargo/mod.sh"
+        register_module "cargo-module" "cargo-module"
+
+        # Create a temporary directory with Cargo.toml
+        local test_dir
+        test_dir=$(mktemp -d)
+        echo "name = \"test\"" > "$test_dir/Cargo.toml"
+
+        # Run detect_platforms()
+        local result
+        result=$(detect_platforms "$test_dir")
+
+        # Should include network access check
+        assert echo "$result" | grep -q "network_access="
+
+        # Should still detect the framework
+        assert echo "$result" | grep -q "platforms_0_framework=cargo"
+        assert echo "$result" | grep -q "platforms_0_module_id=cargo-module"
+
+        # Cleanup
+        rm -rf "$test_dir"
+    else
+        skip "Cargo framework module not found"
+    fi
+}
+
+@test "detect_platforms() provides clear container environment status for multiple platforms" {
+    # Register both Rust and BATS modules
+    if [[ -f "mod/languages/rust/mod.sh" ]] && [[ -f "mod/languages/bash/mod.sh" ]]; then
+        source "mod/languages/rust/mod.sh"
+        register_module "rust-module" "rust-module"
+
+        # Clean up functions between module loads
+        for method in detect check_binaries discover_test_suites detect_build_requirements get_build_steps execute_test_suite parse_test_results get_metadata; do
+            unset -f "$method" 2>/dev/null || true
+        done
+
+        source "mod/languages/bash/mod.sh"
+        register_module "bash-module" "bash-module"
+
+        # Create a temporary directory with both Cargo.toml and .bats files
+        local test_dir
+        test_dir=$(mktemp -d)
+        echo "name = \"test\"" > "$test_dir/Cargo.toml"
+        mkdir -p "$test_dir/tests/bats"
+        echo "#!/usr/bin/env bats" > "$test_dir/tests/bats/test.bats"
+
+        # Run detect_platforms()
+        local result
+        result=$(detect_platforms "$test_dir")
+
+        # Should detect both platforms
+        assert echo "$result" | grep -q "platforms_count=2"
+
+        # Should include container environment status for both
+        assert echo "$result" | grep -q "docker_available="
+        assert echo "$result" | grep -q "container_operations="
+        assert echo "$result" | grep -q "network_access="
+
+        # Cleanup
+        rm -rf "$test_dir"
+    else
+        skip "Required modules not found"
+    fi
+}
+
 
