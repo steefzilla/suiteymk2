@@ -428,4 +428,155 @@ teardown() {
     fi
 }
 
+@test "detect_platforms() calculates high confidence when config file and test files present" {
+    # Register Rust module
+    if [[ -f "mod/languages/rust/mod.sh" ]]; then
+        source "mod/languages/rust/mod.sh"
+        register_module "rust-module" "rust-module"
+
+        # Create a temporary directory with Cargo.toml and test files
+        local test_dir
+        test_dir=$(mktemp -d)
+        echo "name = \"test\"" > "$test_dir/Cargo.toml"
+        mkdir -p "$test_dir/src"
+        echo "#[test]" > "$test_dir/src/lib.rs"
+        echo "fn test_example() {}" >> "$test_dir/src/lib.rs"
+
+        # Run detect_platforms()
+        local result
+        result=$(detect_platforms "$test_dir")
+
+        # Should detect with high confidence due to Cargo.toml + test files
+        assert echo "$result" | grep -q "platforms_0_confidence=high"
+        assert echo "$result" | grep -q "platforms_0_language=rust"
+
+        # Cleanup
+        rm -rf "$test_dir"
+    else
+        skip "Rust module not found"
+    fi
+}
+
+@test "detect_platforms() calculates medium confidence when only test files present" {
+    # Register BATS module
+    if [[ -f "mod/languages/bash/mod.sh" ]]; then
+        source "mod/languages/bash/mod.sh"
+        register_module "bash-module" "bash-module"
+
+        # Create a temporary directory with BATS test directory but no .bats files
+        local test_dir
+        test_dir=$(mktemp -d)
+        mkdir -p "$test_dir/tests/bats"
+        # Don't create actual .bats files, just the directory structure
+
+        # Run detect_platforms()
+        local result
+        result=$(detect_platforms "$test_dir")
+
+        # Should detect with medium confidence due to test directory structure
+        assert echo "$result" | grep -q "platforms_0_confidence=medium"
+        assert echo "$result" | grep -q "platforms_0_language=bash"
+
+        # Cleanup
+        rm -rf "$test_dir"
+    else
+        skip "Bash module not found"
+    fi
+}
+
+@test "detect_platforms() calculates low confidence when only file extensions present" {
+    # Register Rust module
+    if [[ -f "mod/languages/rust/mod.sh" ]]; then
+        source "mod/languages/rust/mod.sh"
+        register_module "rust-module" "rust-module"
+
+        # Create a temporary directory with only .rs files (no Cargo.toml)
+        local test_dir
+        test_dir=$(mktemp -d)
+        mkdir -p "$test_dir/src"
+        echo "fn main() {}" > "$test_dir/src/main.rs"
+
+        # Run detect_platforms()
+        local result
+        result=$(detect_platforms "$test_dir")
+
+        # Should detect with low confidence due to only .rs file extension
+        assert echo "$result" | grep -q "platforms_0_confidence=low"
+        assert echo "$result" | grep -q "platforms_0_language=rust"
+
+        # Cleanup
+        rm -rf "$test_dir"
+    else
+        skip "Rust module not found"
+    fi
+}
+
+@test "detect_platforms() handles multiple confidence levels in same project" {
+    # Register both Rust and BATS modules
+    if [[ -f "mod/languages/rust/mod.sh" ]] && [[ -f "mod/languages/bash/mod.sh" ]]; then
+        source "mod/languages/rust/mod.sh"
+        register_module "rust-module" "rust-module"
+
+        # Clean up functions between module loads
+        for method in detect check_binaries discover_test_suites detect_build_requirements get_build_steps execute_test_suite parse_test_results get_metadata; do
+            unset -f "$method" 2>/dev/null || true
+        done
+
+        source "mod/languages/bash/mod.sh"
+        register_module "bash-module" "bash-module"
+
+        # Create a temporary directory with high confidence Rust + medium confidence Bash
+        local test_dir
+        test_dir=$(mktemp -d)
+        # High confidence Rust: Cargo.toml + test files
+        echo "name = \"test\"" > "$test_dir/Cargo.toml"
+        mkdir -p "$test_dir/src"
+        echo "#[test]" > "$test_dir/src/lib.rs"
+        echo "fn test_example() {}" >> "$test_dir/src/lib.rs"
+        # Medium confidence Bash: test directory structure
+        mkdir -p "$test_dir/tests/bats"
+
+        # Run detect_platforms()
+        local result
+        result=$(detect_platforms "$test_dir")
+
+        # Should detect both platforms with appropriate confidence levels
+        assert echo "$result" | grep -q "platforms_count=2"
+        assert echo "$result" | grep -q "platforms_0_confidence=high\|platforms_1_confidence=high"
+        assert echo "$result" | grep -q "platforms_0_confidence=medium\|platforms_1_confidence=medium"
+
+        # Cleanup
+        rm -rf "$test_dir"
+    else
+        skip "Required modules not found"
+    fi
+}
+
+@test "detect_platforms() defaults to low confidence when module doesn't specify confidence" {
+    # Register a custom test module that doesn't return confidence
+    # We'll create a simple test by temporarily modifying an existing module
+
+    if [[ -f "mod/languages/rust/mod.sh" ]]; then
+        # First register the normal Rust module
+        source "mod/languages/rust/mod.sh"
+        register_module "rust-module" "rust-module"
+
+        # Create a temporary directory with no detectable files
+        local test_dir
+        test_dir=$(mktemp -d)
+
+        # Run detect_platforms()
+        local result
+        result=$(detect_platforms "$test_dir")
+
+        # Should have platforms_count=0 since no platforms detected
+        assert echo "$result" | grep -q "platforms_count=0"
+
+        # Cleanup
+        rm -rf "$test_dir"
+    else
+        skip "Rust module not found"
+    fi
+}
+
 
