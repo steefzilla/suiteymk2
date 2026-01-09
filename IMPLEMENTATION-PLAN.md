@@ -393,12 +393,12 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **1.2.4 Minimal Module Implementation (Rust)**
 *Create mod/languages/rust/mod.sh with stub implementations of detect() and get_metadata() methods.*
-- [ ] **Red**: Write test for Rust module stub
+- [x] **Red**: Write test for Rust module stub
   - Test: Module can be registered
   - Test: Module implements `detect()` method (returns detection result)
   - Test: Module implements `get_metadata()` method
-- [ ] **Green**: Create `mod/languages/rust/mod.sh` with stub implementations
-- [ ] **Refactor**: Improve module structure, add documentation
+- [x] **Green**: Create `mod/languages/rust/mod.sh` with stub implementations
+- [x] **Refactor**: Improve module structure, add documentation
 
 **1.2.5 Minimal Module Implementation (Bash)**
 *Create mod/languages/bash/mod.sh with stub implementations of detect() and get_metadata() methods.*
