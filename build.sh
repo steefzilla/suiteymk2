@@ -484,14 +484,133 @@ main() {
         exit $EXIT_SUITEY_ERROR
     fi
     
-    # Store directory for future workflow execution
-    # For now, we accept the directory and show a placeholder message
-    # In future phases, this will trigger the full workflow
+    # Register built-in modules
+    # These are the core language and framework modules included in the bundle
+    if [[ -f "mod/languages/rust/mod.sh" ]]; then
+        source "mod/languages/rust/mod.sh" 2>/dev/null || true
+        register_module "rust-module" "rust-module" 2>/dev/null || true
+    fi
+
+    if [[ -f "mod/languages/bash/mod.sh" ]]; then
+        source "mod/languages/bash/mod.sh" 2>/dev/null || true
+        register_module "bash-module" "bash-module" 2>/dev/null || true
+    fi
+
+    if [[ -f "mod/frameworks/cargo/mod.sh" ]]; then
+        source "mod/frameworks/cargo/mod.sh" 2>/dev/null || true
+        register_module "cargo-module" "cargo-module" 2>/dev/null || true
+    fi
+
+    if [[ -f "mod/frameworks/bats/mod.sh" ]]; then
+        source "mod/frameworks/bats/mod.sh" 2>/dev/null || true
+        register_module "bats-module" "bats-module" 2>/dev/null || true
+    fi
+
+    # Perform platform detection
     echo "Suitey v0.1.0"
-    echo "Target directory: $normalized_dir"
+    echo "Analyzing project: $normalized_dir"
     echo ""
-    echo "Workflow execution will be implemented in future phases."
-    echo "Directory validated and ready for processing."
+
+    # Detect platforms in the target directory
+    local detection_results
+    detection_results=$(detect_platforms "$normalized_dir" 2>/dev/null || echo "platforms_count=0")
+
+    # Display container environment status
+    echo "Container Environment:"
+    if echo "$detection_results" | grep -q "docker_command_available=true"; then
+        echo "  ✓ Docker command available"
+    else
+        echo "  ✗ Docker command not found"
+    fi
+
+    if echo "$detection_results" | grep -q "docker_daemon_available=true"; then
+        echo "  ✓ Docker daemon running"
+    else
+        echo "  ✗ Docker daemon not accessible"
+    fi
+
+    if echo "$detection_results" | grep -q "container_operations=true"; then
+        echo "  ✓ Container operations functional"
+    else
+        echo "  ✗ Container operations failed"
+    fi
+
+    if echo "$detection_results" | grep -q "network_access=true"; then
+        echo "  ✓ Network access available"
+    else
+        echo "  ✗ Network access issues"
+    fi
+
+    # Display warnings if any
+    local warning_count
+    warning_count=$(echo "$detection_results" | grep "^docker_warnings_count=" | cut -d'=' -f2)
+    if [[ "$warning_count" -gt 0 ]]; then
+        echo ""
+        echo "Warnings:"
+        local i=0
+        while [[ $i -lt "$warning_count" ]]; do
+            local warning
+            warning=$(echo "$detection_results" | grep "^docker_warnings_${i}=" | cut -d'=' -f2-)
+            if [[ -n "$warning" ]]; then
+                echo "  ⚠ $warning"
+            fi
+            ((i++))
+        done
+    fi
+
+    echo ""
+    echo "Platform Detection:"
+
+    # Get platform count
+    local platforms_count
+    platforms_count=$(echo "$detection_results" | grep "^platforms_count=" | cut -d'=' -f2)
+
+    if [[ "$platforms_count" -eq 0 ]]; then
+        echo "  No supported platforms detected in this project."
+        echo ""
+        echo "Supported platforms:"
+        echo "  - Rust (Cargo.toml projects)"
+        echo "  - Bash (BATS test projects)"
+        exit $EXIT_SUCCESS
+    fi
+
+    # Display detected platforms
+    # Collect unique language+framework combinations with highest confidence
+    local detected_projects=""
+    local i=0
+    while [[ $i -lt "$platforms_count" ]]; do
+        local language
+        local framework
+        local confidence
+        local module_type
+
+        language=$(echo "$detection_results" | grep "^platforms_${i}_language=" | head -1 | cut -d'=' -f2)
+        framework=$(echo "$detection_results" | grep "^platforms_${i}_framework=" | head -1 | cut -d'=' -f2)
+        confidence=$(echo "$detection_results" | grep "^platforms_${i}_confidence=" | head -1 | cut -d'=' -f2)
+        module_type=$(echo "$detection_results" | grep "^platforms_${i}_module_type=" | head -1 | cut -d'=' -f2)
+
+        if [[ -n "$language" ]]; then
+            local project_key="$language"
+            if [[ -n "$framework" ]]; then
+                project_key="$project_key-$framework"
+            fi
+
+            # Check if we already have this project combination
+            if ! echo "$detected_projects" | grep -q "^$project_key:"; then
+                # New project combination
+                detected_projects="${detected_projects}$project_key:$confidence:$framework"$'\n'
+                echo "  ✓ $language project detected (confidence: $confidence)"
+                if [[ -n "$framework" ]]; then
+                    echo "    Framework: $framework"
+                fi
+            fi
+        fi
+
+        ((i++))
+    done
+
+    echo ""
+    echo "Full workflow execution will be implemented in future phases."
     exit $EXIT_SUCCESS
 }
 

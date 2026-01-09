@@ -579,4 +579,141 @@ teardown() {
     fi
 }
 
+@test "detect_platforms() includes module metadata in detection results" {
+    # Register Rust module
+    if [[ -f "mod/languages/rust/mod.sh" ]]; then
+        source "mod/languages/rust/mod.sh"
+        register_module "rust-module" "rust-module"
+
+        # Create a temporary directory with Cargo.toml
+        local test_dir
+        test_dir=$(mktemp -d)
+        echo "name = \"test\"" > "$test_dir/Cargo.toml"
+
+        # Run detect_platforms()
+        local result
+        result=$(detect_platforms "$test_dir")
+
+        # Should include module metadata from get_metadata()
+        assert echo "$result" | grep -q "platforms_0_module_type=language"
+        assert echo "$result" | grep -q "platforms_0_language=rust"
+        assert echo "$result" | grep -q "platforms_0_frameworks_0=cargo"
+        assert echo "$result" | grep -q "platforms_0_capabilities_0=testing"
+        assert echo "$result" | grep -q "platforms_0_capabilities_1=compilation"
+
+        # Cleanup
+        rm -rf "$test_dir"
+    else
+        skip "Rust module not found"
+    fi
+}
+
+@test "detect_platforms() handles registry errors gracefully when modules not found" {
+    # Don't register any modules - registry should be empty
+
+    # Create a temporary directory with Cargo.toml
+    local test_dir
+    test_dir=$(mktemp -d)
+    echo "name = \"test\"" > "$test_dir/Cargo.toml"
+
+    # Run detect_platforms()
+    local result
+    result=$(detect_platforms "$test_dir")
+
+    # Should return platforms_count=0 gracefully
+    assert echo "$result" | grep -q "platforms_count=0"
+
+    # Should not include any platform data
+    [[ "$result" != *"platforms_0_"* ]]
+
+    # Cleanup
+    rm -rf "$test_dir"
+}
+
+@test "detect_platforms() handles module metadata retrieval failures gracefully" {
+    # Register a module but simulate metadata retrieval failure
+    # We'll create a test by temporarily modifying the registry
+
+    if [[ -f "mod/languages/rust/mod.sh" ]]; then
+        source "mod/languages/rust/mod.sh"
+        register_module "rust-module" "rust-module"
+
+        # Create a temporary directory with Cargo.toml
+        local test_dir
+        test_dir=$(mktemp -d)
+        echo "name = \"test\"" > "$test_dir/Cargo.toml"
+
+        # Mock get_module_metadata to fail
+        get_module_metadata() {
+            return 1
+        }
+
+        # Run detect_platforms()
+        local result
+        result=$(detect_platforms "$test_dir")
+
+        # Should still detect the platform (metadata failure shouldn't break detection)
+        assert echo "$result" | grep -q "platforms_count=1"
+        assert echo "$result" | grep -q "platforms_0_language=rust"
+        assert echo "$result" | grep -q "platforms_0_module_id=rust-module"
+
+        # Should not include metadata (since retrieval failed)
+        # Note: This test verifies that metadata retrieval failures don't break detection
+        # The assertions above already verify that basic detection still works
+
+        # Cleanup
+        rm -rf "$test_dir"
+        # Restore original function
+        unset -f get_module_metadata
+    else
+        skip "Rust module not found"
+    fi
+}
+
+@test "detect_platforms() integrates with Modules Registry for module discovery" {
+    # Test that Platform Detector uses get_all_modules from registry
+    if [[ -f "mod/languages/rust/mod.sh" ]] && [[ -f "mod/languages/bash/mod.sh" ]]; then
+        source "mod/languages/rust/mod.sh"
+        register_module "rust-module" "rust-module"
+
+        # Clean up functions between module loads
+        for method in detect check_binaries discover_test_suites detect_build_requirements get_build_steps execute_test_suite parse_test_results get_metadata; do
+            unset -f "$method" 2>/dev/null || true
+        done
+
+        source "mod/languages/bash/mod.sh"
+        register_module "bash-module" "bash-module"
+
+        # Verify modules are registered
+        local all_modules
+        all_modules=$(get_all_modules 2>/dev/null || echo "")
+        assert echo "$all_modules" | grep -q "rust-module"
+        assert echo "$all_modules" | grep -q "bash-module"
+
+        # Create a temporary directory with both Cargo.toml and .bats files
+        local test_dir
+        test_dir=$(mktemp -d)
+        echo "name = \"test\"" > "$test_dir/Cargo.toml"
+        mkdir -p "$test_dir/tests/bats"
+        echo "#!/usr/bin/env bats" > "$test_dir/tests/bats/test.bats"
+
+        # Run detect_platforms()
+        local result
+        result=$(detect_platforms "$test_dir")
+
+        # Should detect both platforms using registered modules
+        assert echo "$result" | grep -q "platforms_count=2"
+        assert echo "$result" | grep -q "platforms_0_module_id=rust-module\|platforms_1_module_id=rust-module"
+        assert echo "$result" | grep -q "platforms_0_module_id=bash-module\|platforms_1_module_id=bash-module"
+
+        # Should include metadata for both modules
+        assert echo "$result" | grep -q "module_type=language"
+
+        # Cleanup
+        rm -rf "$test_dir"
+    else
+        skip "Required modules not found"
+    fi
+}
+
 

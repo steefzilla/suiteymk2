@@ -16,6 +16,7 @@ fi
 # Behavior: Verifies Docker daemon accessibility, basic container operations, and network connectivity
 check_container_environment() {
     local results=""
+    local warnings=""
 
     # Check Docker command availability
     local docker_command_available="false"
@@ -30,7 +31,11 @@ check_container_environment() {
         # Check if docker daemon is accessible
         if docker info >/dev/null 2>&1; then
             docker_daemon_available="true"
+        else
+            warnings="${warnings}Docker daemon is not running or accessible. Suitey requires Docker for test execution."$'\n'
         fi
+    else
+        warnings="${warnings}Docker command not found. Install Docker to enable test execution in containers."$'\n'
     fi
     results="${results}docker_daemon_available=${docker_daemon_available}"$'\n'
 
@@ -40,6 +45,8 @@ check_container_environment() {
         # Try to run a simple container operation
         if docker run --rm alpine:latest echo "test" >/dev/null 2>&1; then
             container_operations="true"
+        else
+            warnings="${warnings}Cannot execute basic container operations. Check Docker permissions and configuration."$'\n'
         fi
     fi
     results="${results}container_operations=${container_operations}"$'\n'
@@ -52,12 +59,29 @@ check_container_environment() {
             network_access="true"
             # Clean up the pulled image
             docker rmi alpine:latest >/dev/null 2>&1 || true
+        else
+            warnings="${warnings}Cannot pull Docker images. Check network connectivity and Docker registry access."$'\n'
         fi
     fi
     results="${results}network_access=${network_access}"$'\n'
 
     # Provide backward compatibility aliases
     results="${results}docker_available=${docker_daemon_available}"$'\n'
+
+    # Add warnings to results
+    if [[ -n "$warnings" ]]; then
+        # Convert warnings to flat data format
+        local warning_count=0
+        while IFS= read -r warning_line || [[ -n "$warning_line" ]]; do
+            if [[ -n "$warning_line" ]]; then
+                results="${results}docker_warnings_${warning_count}=${warning_line}"$'\n'
+                ((warning_count++))
+            fi
+        done <<< "$warnings"
+        results="${results}docker_warnings_count=${warning_count}"$'\n'
+    else
+        results="${results}docker_warnings_count=0"$'\n'
+    fi
 
     echo "$results"
 }
@@ -173,6 +197,20 @@ detect_platforms() {
 
             results="${results}"$'\n'"platforms_${platform_index}_confidence=${confidence}"
             results="${results}"$'\n'"platforms_${platform_index}_module_id=${module_id}"
+
+            # Add module metadata from get_metadata()
+            local module_metadata
+            if declare -f get_metadata >/dev/null 2>&1; then
+                module_metadata=$(get_metadata 2>/dev/null || echo "")
+                if [[ -n "$module_metadata" ]]; then
+                    # Parse and prefix each metadata line with platform index
+                    while IFS= read -r metadata_line || [[ -n "$metadata_line" ]]; do
+                        if [[ -n "$metadata_line" ]]; then
+                            results="${results}"$'\n'"platforms_${platform_index}_${metadata_line}"
+                        fi
+                    done <<< "$module_metadata"
+                fi
+            fi
 
             # Add detection indicators
             local indicators_count
