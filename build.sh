@@ -944,6 +944,9 @@ create_minified_version() {
     if ! command -v xz >/dev/null 2>&1; then
         error "xz command not found. Required for minification."
     fi
+    if ! command -v md5sum >/dev/null 2>&1; then
+        error "md5sum command not found. Required for minification integrity checks."
+    fi
 
     # Minify the input file to reduce size before compression
     local minified_content
@@ -953,11 +956,26 @@ create_minified_version() {
     local payload
     payload=$(echo "$minified_content" | xz -c | base64 -w 0)
 
-    # Create the minified version
+    # Calculate MD5 hash of the payload for integrity verification
+    local payload_hash
+    payload_hash=$(echo "$payload" | md5sum | cut -d' ' -f1)
+
+    log "Payload integrity hash: $payload_hash"
+
+    # Create the minified version with integrity verification
     cat > "$minified_file" << EOF
 #!/usr/bin/env bash
-echo "Unpacking Suitey" >&2
-eval "\$(echo '$payload' | base64 -d | xz -dc)"
+E="$payload_hash"
+echo -n "File Integrity: "
+P='$payload'
+A=\$(echo "\$P" | md5sum | cut -d' ' -f1)
+if [[ "\$A" != "\$E" ]]; then
+echo ✗
+exit 1
+fi
+echo "✓
+Unpacking..."
+eval "\$(echo "\$P" | base64 -d | xz -dc)"
 exit \$?
 EOF
 
