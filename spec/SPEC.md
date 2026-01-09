@@ -215,10 +215,11 @@ The architecture follows a hierarchical orchestration pattern:
    - Platform detection results inform both Test Suite Detection and Build System Detection
 
 3. **Suitey Modules Registry** is a shared component:
-   - Maintains a registry of Suitey Modules (Rust, Bash, etc.)
+   - Maintains a registry of Suitey Modules organized by type (languages, frameworks, projects)
    - Provides language-specific detection, discovery, and execution logic
    - Used by Platform Detector, Project Scanner and Build System Detector to coordinate module-based detection
    - Each module implements detection, discovery, build detection, and execution methods
+   - Supports module type-based lookup and priority-based resolution (project > framework > language)
 
 4. **Test Suite Detection** is a component orchestrated by Project Scanner:
    - Operates after Platform Detector has identified available platforms (Test Suite Detector)
@@ -295,7 +296,23 @@ The execution follows a sequential workflow orchestrated by Project Scanner:
 
 ### Suitey Modules
 
-Suitey Modules are the core abstraction that enables language-agnostic test execution. Each module implements a consistent interface:
+Suitey Modules are the core abstraction that enables language-agnostic test execution. Modules are organized into three types:
+
+1. **Language Modules** (`/mod/languages/{name}/`): Detect programming languages and provide language-level capabilities
+   - Examples: Rust, Python, JavaScript, Bash
+   - Responsibilities: Language detection, language-specific metadata, binary checking
+
+2. **Framework Modules** (`/mod/frameworks/{name}/`): Handle framework-specific operations for test discovery, execution, and parsing
+   - Examples: Cargo (Rust), pytest (Python), Jest (JavaScript), BATS (Bash)
+   - Responsibilities: Test suite discovery, test execution, result parsing, framework-specific build steps
+
+3. **Project Modules** (`/mod/projects/{name}/`): Provide project-specific configurations and customizations
+   - Examples: Company standards, legacy system support, microservices patterns
+   - Responsibilities: Override default behavior, customize test patterns, project-specific edge cases
+
+**Module Priority:** Project modules (highest) > Framework modules > Language modules (lowest)
+
+Each module implements a consistent interface:
 
 - **Detection**: Determines if this language/framework is present in the project using language-specific heuristics
 - **Discovery**: Finds test files/suites for this language using language-specific patterns
@@ -304,9 +321,9 @@ Suitey Modules are the core abstraction that enables language-agnostic test exec
 - **Execution**: Runs tests using the language's native tools in containers
 - **Parsing**: Extracts test results (counts, status, output) from framework output
 
-Supported languages:
-- Rust: cargo test
-- Bash/Shell: BATS
+Supported languages and frameworks:
+- Rust: Cargo framework
+- Bash/Shell: BATS framework
 
 ### Containerized Execution
 

@@ -409,10 +409,60 @@ This requirement applies to all phases and ensures code quality and test coverag
 - [x] **Green**: Create `mod/languages/bash/mod.sh` with stub implementations
 - [x] **Refactor**: Ensure consistent module structure
 
+**1.2.6 Module Type Support**
+*Add support for module types (language, framework, project) in the registry with type-based lookup.*
+- [x] **Red**: Write tests for module type support
+  - Test: Register language module with `module_type=language`
+  - Test: Register framework module with `module_type=framework`
+  - Test: Register project module with `module_type=project`
+  - Test: Get modules by type (`get_modules_by_type()`)
+  - Test: Module priority based on type (project > framework > language)
+- [x] **Green**: Implement module type support in registry
+  - Add `module_type` field to metadata validation
+  - Implement `get_modules_by_type()` function
+  - Implement priority-based module selection
+- [x] **Refactor**: Improve type-based lookup, add convenience methods
+
+**1.2.7 Minimal Framework Module Implementation (Cargo)**
+*Create mod/frameworks/cargo/mod.sh with framework-specific implementations for Rust/Cargo.*
+- [ ] **Red**: Write test for Cargo framework module stub
+  - Test: Module can be registered as framework type
+  - Test: Module implements `discover_test_suites()` method
+  - Test: Module implements `execute_test_suite()` method
+  - Test: Module implements `parse_test_results()` method
+  - Test: Module metadata includes `module_type=framework`
+- [ ] **Green**: Create `mod/frameworks/cargo/mod.sh` with framework implementations
+- [ ] **Refactor**: Ensure framework modules work with language modules
+
+**1.2.8 Minimal Framework Module Implementation (BATS)**
+*Create mod/frameworks/bats/mod.sh with framework-specific implementations for Bash/BATS.*
+- [ ] **Red**: Write test for BATS framework module stub
+  - Test: Module can be registered as framework type
+  - Test: Module implements framework-specific methods
+  - Test: Module metadata includes `module_type=framework`
+- [ ] **Green**: Create `mod/frameworks/bats/mod.sh` with framework implementations
+- [ ] **Refactor**: Ensure consistent framework module structure
+
+**1.2.9 Project Module Support**
+*Add support for project modules that can override default behavior for specific projects.*
+- [ ] **Red**: Write tests for project module support
+  - Test: Project module can override language module behavior
+  - Test: Project module can override framework module behavior
+  - Test: Project module has highest priority
+  - Test: Project modules can be discovered in project directory
+- [ ] **Green**: Implement project module support
+  - Add project module discovery
+  - Implement priority-based module resolution
+  - Add project module registration
+- [ ] **Refactor**: Improve project module integration
+
 **Acceptance Criteria**:
-- Registry can register and retrieve modules
-- Interface validation works correctly
-- At least two stub modules (Rust, Bash) can be registered
+- Registry can register and retrieve modules of all three types (language, framework, project)
+- Interface validation works correctly for all module types
+- At least two language modules (Rust, Bash) can be registered
+- At least two framework modules (Cargo, BATS) can be registered
+- Module type-based lookup works correctly
+- Module priority system works (project > framework > language)
 - All registry operations respect filesystem isolation (only `/tmp`)
 
 ---

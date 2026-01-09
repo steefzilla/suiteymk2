@@ -19,11 +19,87 @@ Suitey Modules are organized in a directory-based structure for easy development
 ```
 
 **Directory Components:**
-- **`{type}`**: Module category (e.g., `languages`, `frameworks`)
-- **`{name}`**: Module identifier (e.g., `rust`, `bash`)
+- **`{type}`**: Module category (e.g., `languages`, `frameworks`, `projects`)
+- **`{name}`**: Module identifier (e.g., `rust`, `cargo`, `my-project`)
 - **`mod.sh`**: Core module implementation with interface methods
 - **`tests/`**: Complete test suite for the module
 - **`README.md`**: Documentation, usage, examples
+
+## Module Types
+
+Suitey Modules are organized into three distinct types, each serving a specific purpose in the detection and execution workflow:
+
+### 1. Language Modules (`/mod/languages/{name}/`)
+
+Language modules handle **language-level detection and operations**. They identify which programming languages are present in a project and provide language-specific capabilities.
+
+**Examples:**
+- `mod/languages/rust/mod.sh` - Detects Rust language presence
+- `mod/languages/python/mod.sh` - Detects Python language presence
+- `mod/languages/bash/mod.sh` - Detects Bash/Shell language presence
+
+**Responsibilities:**
+- Detect if a programming language is present in the project
+- Identify language-specific indicators (file extensions, config files, etc.)
+- Provide language-level metadata (language name, supported frameworks, capabilities)
+- Check for language-specific binaries and tools
+
+**Detection Priority:** Language modules are typically checked first during platform detection.
+
+### 2. Framework Modules (`/mod/frameworks/{name}/`)
+
+Framework modules handle **framework-specific operations** for test discovery, execution, and parsing. They work in conjunction with language modules to provide framework-specific behavior.
+
+**Examples:**
+- `mod/frameworks/cargo/mod.sh` - Handles Cargo framework (Rust)
+- `mod/frameworks/pytest/mod.sh` - Handles pytest framework (Python)
+- `mod/frameworks/bats/mod.sh` - Handles BATS framework (Bash)
+- `mod/frameworks/jest/mod.sh` - Handles Jest framework (JavaScript)
+
+**Responsibilities:**
+- Discover test suites using framework-specific patterns
+- Execute tests using framework-specific test runners
+- Parse framework-specific test output
+- Detect framework-specific build requirements
+- Provide framework-specific build steps
+
+**Relationship to Language Modules:** Framework modules are selected based on detected languages. A language module may indicate which frameworks it supports, and framework modules provide the actual implementation for those frameworks.
+
+### 3. Project Modules (`/mod/projects/{name}/`)
+
+Project modules handle **project-specific configurations and customizations**. They allow individual projects to override or extend default behavior for their specific needs.
+
+**Examples:**
+- `mod/projects/my-company-standard/mod.sh` - Company-wide testing standards
+- `mod/projects/legacy-system/mod.sh` - Custom behavior for legacy projects
+- `mod/projects/microservices/mod.sh` - Microservices-specific test patterns
+
+**Responsibilities:**
+- Override default detection behavior for specific projects
+- Customize test discovery patterns
+- Modify build steps for project-specific requirements
+- Provide project-specific execution configurations
+- Handle project-specific edge cases
+
+**Priority:** Project modules have the highest priority and can override language and framework module behavior when present. They are typically detected last and take precedence.
+
+### Module Interaction and Priority
+
+Modules interact in a hierarchical manner:
+
+1. **Language Detection**: Language modules detect which languages are present
+2. **Framework Selection**: Framework modules are selected based on detected languages
+3. **Project Customization**: Project modules override or extend behavior as needed
+
+**Priority Order (highest to lowest):**
+1. Project modules (highest priority - can override everything)
+2. Framework modules (provide framework-specific behavior)
+3. Language modules (provide language-level detection)
+
+**Example Workflow:**
+1. Language module (`rust`) detects Rust is present
+2. Framework module (`cargo`) handles Cargo-specific test discovery and execution
+3. Project module (`my-project`) may override specific behaviors for this project
 
 ## Responsibilities
 
@@ -161,8 +237,9 @@ All Suitey Modules must implement a consistent interface that defines the contra
 - **`get_metadata() -> SuiteyModuleMetadata`**
   - Returns Suitey Module metadata
   - Returns module metadata as flat data:
-    - `language=...` - Programming language this module handles
-    - `frameworks_0=...` - Supported frameworks for this language
+    - `module_type=language/framework/project` - Type of module (required)
+    - `language=...` - Programming language this module handles (for language/framework modules)
+    - `frameworks_0=...` - Supported frameworks (for language modules) or framework name (for framework modules)
     - `frameworks_1=...`
     - `frameworks_count=N`
     - `project_type=...` - Type of projects this module handles
@@ -173,6 +250,7 @@ All Suitey Modules must implement a consistent interface that defines the contra
     - `required_binaries_0=...` - Required binaries
     - `required_binaries_1=...`
     - `required_binaries_count=N`
+    - `priority=N` - Module priority (higher = more precedence, defaults to 0 for language, 1 for framework, 2 for project)
 
 ### Interface Compliance
 
@@ -189,8 +267,17 @@ The Suitey Modules Registry maintains a registry of all available Suitey Modules
 
 Built-in modules are registered automatically when the Suitey Modules Registry is initialized. These include:
 
-- **Rust Module** - Handles Rust language with Cargo framework
-- **Bash Module** - Handles Bash language with BATS framework
+**Language Modules:**
+- **Rust Language Module** (`mod/languages/rust/mod.sh`) - Detects Rust language presence
+- **Bash Language Module** (`mod/languages/bash/mod.sh`) - Detects Bash/Shell language presence
+
+**Framework Modules:**
+- Framework modules are typically registered when their corresponding language is detected, or can be registered independently
+- Examples: Cargo (Rust), BATS (Bash), pytest (Python), Jest (JavaScript)
+
+**Project Modules:**
+- Project modules are optional and are typically discovered in the project directory itself
+- They can be placed in the project root (e.g., `.suitey/mod/projects/{name}/mod.sh`) or in the Suitey installation
 
 ### 2. Registration Process
 
@@ -259,11 +346,24 @@ The registry provides methods to access registered modules:
   - Returns all registered capabilities
   - Used for capability enumeration
 
-### 3. Language Detection Lookup
+### 3. Type-Based Lookup
+
+- **`get_modules_by_type(module_type: string) -> SuiteyModule[]`**
+  - Returns modules of a specific type (`language`, `framework`, or `project`)
+  - Used to filter modules by their category
+  - Example: `get_modules_by_type("language")` returns all language modules
 
 - **`get_language_modules() -> SuiteyModule[]`**
-  - Returns modules that can detect languages
+  - Returns modules that can detect languages (convenience method for `get_modules_by_type("language")`)
   - Used by Platform Detector
+
+- **`get_framework_modules() -> SuiteyModule[]`**
+  - Returns all framework modules (convenience method for `get_modules_by_type("framework")`)
+  - Used by Test Suite Detector and Execution System
+
+- **`get_project_modules() -> SuiteyModule[]`**
+  - Returns all project modules (convenience method for `get_modules_by_type("project")`)
+  - Used to check for project-specific customizations
 
 ### 4. Metadata Access
 
