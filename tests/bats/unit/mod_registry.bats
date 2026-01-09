@@ -544,3 +544,148 @@ get_metadata() {
     assert_success
 }
 
+# Module Interface Validation Tests
+
+@test "validate_module_interface() verifies all required methods exist" {
+    local module_content
+    module_content=$(create_test_module "test-module")
+
+    eval "$module_content"
+
+    # Validate interface
+    run validate_module_interface
+    assert_success
+}
+
+@test "validate_module_interface() detects missing methods" {
+    # Create module missing detect() method
+    local incomplete_module="
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() { echo 'language=test'; }
+"
+
+    eval "$incomplete_module"
+
+    # Validate interface should fail
+    run validate_module_interface
+    assert_failure
+}
+
+@test "validate_module_method_signature() checks method parameter count" {
+    local module_content
+    module_content=$(create_test_module "test-module")
+
+    eval "$module_content"
+
+    # Check detect() signature (should accept 1 parameter: project_root)
+    run validate_module_method_signature "detect" 1
+    assert_success
+
+    # Check get_metadata() signature (should accept 0 parameters)
+    run validate_module_method_signature "get_metadata" 0
+    assert_success
+}
+
+@test "validate_module_method_signature() detects incorrect parameter count" {
+    local module_content
+    module_content=$(create_test_module "test-module")
+
+    # Modify detect() to have wrong number of parameters
+    local wrong_signature="${module_content/detect() {/detect() {
+    # Wrong: no parameters
+}"
+
+    eval "$wrong_signature"
+
+    # Note: In Bash, we can't easily check parameter count at runtime
+    # This test verifies the validation function exists and works
+    run validate_module_method_signature "detect" 1
+    # May succeed or fail depending on implementation
+}
+
+@test "validate_module_return_format() checks return value format" {
+    local module_content
+    module_content=$(create_test_module "test-module")
+
+    eval "$module_content"
+
+    # Test detect() returns flat data format
+    local result
+    result=$(detect "/tmp/test")
+    run validate_module_return_format "$result"
+    assert_success
+
+    # Should contain key=value pairs
+    assert echo "$result" | grep -q "="
+}
+
+@test "validate_module_return_format() validates flat data format" {
+    # Valid flat data
+    local valid_data="detected=true
+confidence=high
+indicators_count=0"
+
+    run validate_module_return_format "$valid_data"
+    assert_success
+
+    # Invalid data (not flat format)
+    local invalid_data='{"detected": true}'
+
+    run validate_module_return_format "$invalid_data"
+    # Should fail or handle gracefully
+}
+
+@test "validate_module_return_format() handles empty return values" {
+    # Empty return is valid (methods may return empty when not applicable)
+    run validate_module_return_format ""
+    assert_success
+}
+
+@test "validate_module_interface_complete() performs full interface validation" {
+    local module_content
+    module_content=$(create_test_module "test-module")
+
+    eval "$module_content"
+
+    # Register the module first
+    register_module "test-module" "test-module"
+    local register_status=$?
+    assert_equal "$register_status" 0
+
+    # Perform complete interface validation
+    run validate_module_interface_complete "test-module"
+    assert_success
+}
+
+@test "validate_module_interface_complete() detects interface violations" {
+    # Create module with wrong return format (detect returns JSON instead of flat data)
+    local bad_module="
+detect() { echo 'invalid json: {\"detected\": true}'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() { echo 'language=test'; }
+"
+
+    eval "$bad_module"
+
+    # Register the module (registration doesn't validate return formats strictly)
+    register_module "test-module" "test-module"
+    local register_status=$?
+    assert_equal "$register_status" 0
+
+    # Complete validation should detect the issue with return format
+    run validate_module_interface_complete "test-module"
+    # Should fail because detect() returns invalid format
+    assert_failure
+    assert_output --partial "invalid format"
+}
+

@@ -64,6 +64,105 @@ validate_module_metadata() {
     return 0
 }
 
+# Validate module method signature (parameter count)
+# Usage: validate_module_method_signature <method_name> <expected_param_count>
+# Exit code: 0 if valid, 1 if invalid
+# Note: In Bash, we can't easily check parameter count at runtime without calling the function
+# This is a placeholder for signature validation - actual validation would require static analysis
+validate_module_method_signature() {
+    local method_name="$1"
+    local expected_param_count="$2"
+
+    # Check if method exists
+    if ! declare -f "$method_name" >/dev/null 2>&1; then
+        return 1
+    fi
+
+    # In Bash, we can't easily check parameter count without parsing the function definition
+    # For now, we just verify the method exists
+    # Full signature validation would require parsing the function definition
+    return 0
+}
+
+# Validate module return format (flat data format)
+# Usage: validate_module_return_format <return_value>
+# Exit code: 0 if valid flat data format, 1 if invalid
+validate_module_return_format() {
+    local return_value="$1"
+
+    # Empty return is valid (methods may return empty when not applicable)
+    if [[ -z "$return_value" ]]; then
+        return 0
+    fi
+
+    # Check if return value contains key=value pairs (flat data format)
+    # Should not contain JSON-like structures
+    if echo "$return_value" | grep -q '[{}]'; then
+        # Contains braces, likely JSON - invalid
+        return 1
+    fi
+
+    # Check if it contains at least one key=value pair
+    if ! echo "$return_value" | grep -q "^[^=]*="; then
+        # No key=value pairs found - may be invalid
+        # But allow empty or single-line values
+        if [[ -n "${return_value// }" ]]; then
+            # Non-empty but no = sign - might be invalid
+            # For now, be lenient and allow it
+            return 0
+        fi
+    fi
+
+    return 0
+}
+
+# Perform complete interface validation for a module
+# Usage: validate_module_interface_complete <identifier>
+# Exit code: 0 if valid, 1 if invalid
+validate_module_interface_complete() {
+    local identifier="$1"
+
+    if [[ -z "$identifier" ]]; then
+        echo "Error: Module identifier cannot be empty" >&2
+        return 1
+    fi
+
+    # Check if module is registered
+    if [[ -z "${MODULE_REGISTRY[$identifier]}" ]]; then
+        echo "Error: Module '$identifier' is not registered" >&2
+        return 1
+    fi
+
+    # Validate all required methods exist
+    if ! validate_module_interface; then
+        echo "Error: Module '$identifier' does not implement all required methods" >&2
+        return 1
+    fi
+
+    # Validate each method's return format (sample validation)
+    # For detect() method
+    if declare -f "detect" >/dev/null 2>&1; then
+        local sample_result
+        sample_result=$(detect "/tmp" 2>/dev/null || echo "")
+        if ! validate_module_return_format "$sample_result"; then
+            echo "Error: Module '$identifier' method 'detect()' returns invalid format" >&2
+            return 1
+        fi
+    fi
+
+    # Validate get_metadata() return format
+    if declare -f "get_metadata" >/dev/null 2>&1; then
+        local metadata
+        metadata=$(get_metadata 2>/dev/null || echo "")
+        if ! validate_module_return_format "$metadata"; then
+            echo "Error: Module '$identifier' method 'get_metadata()' returns invalid format" >&2
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
 # Register a Suitey module
 # Usage: register_module <identifier> <module_name>
 # Exit code: 0 on success, 1 on error
