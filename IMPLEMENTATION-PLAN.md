@@ -332,12 +332,12 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **1.1.4 Multi-line Support**
 *Implement functions to store and retrieve multi-line values using heredoc syntax in data strings.*
-- [ ] **Red**: Write tests for `data_set_multiline()`, `data_get_multiline()`
+- [x] **Red**: Write tests for `data_set_multiline()`, `data_get_multiline()`
   - Test: Set multi-line value with heredoc syntax
   - Test: Get multi-line value (strip heredoc markers)
   - Test: Handle existing heredoc blocks (replace)
-- [ ] **Green**: Implement multi-line support
-- [ ] **Refactor**: Improve heredoc parsing, handle edge cases
+- [x] **Green**: Implement multi-line support
+- [x] **Refactor**: Improve heredoc parsing, handle edge cases
 
 **1.1.5 Data Validation**
 *Implement functions to validate data format and check if keys exist in data strings.*

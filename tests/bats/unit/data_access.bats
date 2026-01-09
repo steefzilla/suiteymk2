@@ -538,3 +538,191 @@ performance"
     assert_success
     assert_output "4"
 }
+
+# Multi-line Support Tests
+
+@test "data_set_multiline() sets multi-line value with heredoc syntax" {
+    local data="name=suitey
+version=0.1.0"
+
+    local multiline_value="1..3
+ok 1 test1
+ok 2 test2
+ok 3 test3"
+
+    local result
+    result=$(data_set_multiline "$data" "output" "$multiline_value")
+    
+    # Verify heredoc markers are present
+    assert echo "$result" | grep -q "^output<<EOF"
+    assert echo "$result" | grep -q "^EOF$"
+    
+    # Verify content is present
+    assert echo "$result" | grep -q "ok 1 test1"
+    assert echo "$result" | grep -q "ok 2 test2"
+    assert echo "$result" | grep -q "ok 3 test3"
+    
+    # Verify other keys are preserved
+    assert echo "$result" | grep -q "name=suitey"
+    assert echo "$result" | grep -q "version=0.1.0"
+}
+
+@test "data_set_multiline() replaces existing heredoc block" {
+    local data="name=suitey
+output<<EOF
+old line 1
+old line 2
+EOF
+version=0.1.0"
+
+    local multiline_value="new line 1
+new line 2
+new line 3"
+
+    local result
+    result=$(data_set_multiline "$data" "output" "$multiline_value")
+    
+    # Verify old content is gone
+    run grep -q "old line 1" <<< "$result"
+    assert_failure
+    
+    run grep -q "old line 2" <<< "$result"
+    assert_failure
+    
+    # Verify new content is present
+    assert echo "$result" | grep -q "new line 1"
+    assert echo "$result" | grep -q "new line 2"
+    assert echo "$result" | grep -q "new line 3"
+    
+    # Verify only one heredoc block exists
+    local heredoc_count
+    heredoc_count=$(echo "$result" | grep -c "^output<<EOF" || true)
+    assert_equal "$heredoc_count" 1
+}
+
+@test "data_set_multiline() replaces regular key=value entry" {
+    local data="name=suitey
+output=simple value
+version=0.1.0"
+
+    local multiline_value="line 1
+line 2"
+
+    local result
+    result=$(data_set_multiline "$data" "output" "$multiline_value")
+    
+    # Verify regular key=value entry is gone
+    run grep -q "^output=simple value" <<< "$result"
+    assert_failure
+    
+    # Verify heredoc block exists
+    assert echo "$result" | grep -q "^output<<EOF"
+    assert echo "$result" | grep -q "^EOF$"
+    
+    # Verify content is present
+    assert echo "$result" | grep -q "line 1"
+    assert echo "$result" | grep -q "line 2"
+}
+
+@test "data_set_multiline() handles empty multi-line value" {
+    local data="name=suitey"
+
+    local result
+    result=$(data_set_multiline "$data" "output" "")
+    
+    # Verify heredoc block exists even for empty value
+    assert echo "$result" | grep -q "^output<<EOF"
+    assert echo "$result" | grep -q "^EOF$"
+}
+
+@test "data_get_multiline() gets multi-line value from heredoc" {
+    local data="name=suitey
+output<<EOF
+1..3
+ok 1 test1
+ok 2 test2
+ok 3 test3
+EOF
+version=0.1.0"
+
+    run data_get_multiline "$data" "output"
+    assert_success
+    assert_output "1..3
+ok 1 test1
+ok 2 test2
+ok 3 test3"
+}
+
+@test "data_get_multiline() gets single-line value if not heredoc" {
+    local data="name=suitey
+output=simple value
+version=0.1.0"
+
+    run data_get_multiline "$data" "output"
+    assert_success
+    assert_output "simple value"
+}
+
+@test "data_get_multiline() returns empty string for missing key" {
+    local data="name=suitey
+version=0.1.0"
+
+    run data_get_multiline "$data" "nonexistent"
+    assert_success
+    assert_output ""
+}
+
+@test "data_get_multiline() handles empty input (exit code 1)" {
+    run data_get_multiline "" "key"
+    assert_failure
+    assert_equal "$status" 1
+
+    run data_get_multiline "some=data" ""
+    assert_failure
+    assert_equal "$status" 1
+}
+
+@test "data_get_multiline() handles empty heredoc block" {
+    local data="name=suitey
+output<<EOF
+EOF
+version=0.1.0"
+
+    run data_get_multiline "$data" "output"
+    assert_success
+    assert_output ""
+}
+
+@test "data_get_multiline() handles heredoc with special characters" {
+    local data="name=suitey
+command<<EOF
+echo \"hello world\"
+echo 'test'
+echo \$VAR
+EOF
+version=0.1.0"
+
+    run data_get_multiline "$data" "command"
+    assert_success
+    # The output should preserve the special characters as-is
+    assert_output "echo \"hello world\"
+echo 'test'
+echo \$VAR"
+}
+
+@test "data_set_multiline() and data_get_multiline() work together" {
+    local data="name=suitey"
+
+    local multiline_value="line 1
+line 2 with spaces
+line 3"
+
+    # Set multi-line value
+    local result
+    result=$(data_set_multiline "$data" "output" "$multiline_value")
+    
+    # Get multi-line value back
+    run data_get_multiline "$result" "output"
+    assert_success
+    assert_output "$multiline_value"
+}
