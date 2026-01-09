@@ -364,13 +364,13 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **1.2.1 Module Registration**
 *Implement register_module() to register Suitey modules with validation of required interface methods.*
-- [ ] **Red**: Write test `tests/bats/unit/mod_registry.bats` for module registration
+- [x] **Red**: Write test `tests/bats/unit/mod_registry.bats` for module registration
   - Test: Register a module successfully
   - Test: Reject module with duplicate identifier
   - Test: Reject module missing required interface methods
   - Test: Validate module metadata structure
-- [ ] **Green**: Implement `register_module()` in `src/mod_registry.sh`
-- [ ] **Refactor**: Improve validation logic, error messages
+- [x] **Green**: Implement `register_module()` in `src/mod_registry.sh`
+- [x] **Refactor**: Improve validation logic, error messages
 
 **1.2.2 Module Lookup**
 *Implement functions to retrieve modules by identifier, get all modules, and filter by capability.*
