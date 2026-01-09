@@ -477,16 +477,16 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **2.1.1 Basic Detection**
 *Implement detect_platforms() to identify programming languages/frameworks present in a project using module detection.*
-- [ ] **Red**: Write test `tests/bats/unit/platform_detector.bats` for platform detection
+- [x] **Red**: Write test `tests/bats/unit/platform_detector.bats` for platform detection
   - Test: Detect Rust project (presence of `Cargo.toml`)
   - Test: Detect Bash/BATS project (presence of `.bats` files)
   - Test: Return empty list for project with no detected platforms
   - Test: Handle multiple platforms in same project
-- [ ] **Green**: Implement `detect_platforms()` in `src/platform_detector.sh`
+- [x] **Green**: Implement `detect_platforms()` in `src/platform_detector.sh`
   - Use Modules Registry to get available modules
   - Call each module's `detect()` method
   - Aggregate results
-- [ ] **Refactor**: Improve error handling, optimize detection order
+- [x] **Refactor**: Improve error handling, optimize detection order
 
 **2.1.2 Binary Availability Checking**
 *Verify that required binaries (e.g., cargo, bats) are available for detected platforms, skip with warning if missing.*
