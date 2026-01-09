@@ -561,15 +561,15 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **2.2.1 Basic Test File Discovery**
 *Implement discover_test_suites() to find and list test files for detected platforms using module discovery methods.*
-- [ ] **Red**: Write test `tests/bats/unit/test_suite_detector.bats` for test discovery
+- [x] **Red**: Write test `tests/bats/unit/test_suite_detector.bats` for test discovery
   - Test: Discover Rust unit tests in `./example/rust-project/src/` directory
   - Test: Discover Rust integration tests in `./example/rust-project/tests/` directory
   - Test: Discover BATS test files in `./example/bats-project/tests/bats/` directory
   - Test: Return empty list when no tests found
-- [ ] **Green**: Implement `discover_test_suites()` in `src/test_suite_detector.sh`
-  - Use Modules Registry to get modules for detected platforms
-  - Call each module's `discover_test_suites()` method
-- [ ] **Refactor**: Improve discovery logic, handle edge cases
+- [x] **Green**: Implement `discover_test_suites()` in `src/test_suite_detector.sh`
+  - Directly loads and calls module `discover_test_suites()` methods based on platform type
+  - Aggregates results from multiple platforms
+- [x] **Refactor**: Improve discovery logic, handle edge cases
 
 **2.2.2 Suite Grouping**
 *Group discovered test files into distinct test suites (e.g., one suite per BATS file, unit vs integration for Rust).*
