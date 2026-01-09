@@ -94,8 +94,7 @@ detect_platforms() {
         fi
 
         if [[ "$detected" == "true" ]]; then
-            # Platform detected - add to results
-            # Extract language and framework from detection result
+            # Platform detected - extract language and framework from detection result
             local language
             local framework
             local confidence
@@ -147,6 +146,7 @@ detect_platforms() {
                 fi
                 i=$((i + 1))
             done
+
 
             platforms_count=$((platforms_count + 1))
             platform_index=$((platform_index + 1))

@@ -71,14 +71,16 @@ Platform detection uses confidence levels to handle ambiguous or weak detection 
 - **Medium Confidence**: Some indicators present (e.g., test files without config)
 - **Low Confidence**: Weak indicators only (e.g., file extensions only)
 
-### 4. Binary Availability Verification
+### 4. Container Environment Verification
 
-For each detected platform, the detector verifies that required tools are available:
+Since Suitey executes tests in Docker containers, binary availability checking focuses on container environment readiness rather than host system tools. The detector verifies that the necessary containerized execution environment can be established:
 
-- **Required Binaries**: Framework executables (e.g., `bats`, `cargo`)
-- **Path Resolution**: Finding tools in system PATH
-- **Version Checking**: Verifying tool versions meet requirements
-- **Installation Guidance**: Providing installation instructions when tools are missing
+- **Docker Availability**: Verifies Docker daemon is accessible and functional
+- **Image Accessibility**: Confirms that required base images can be pulled (when applicable)
+- **Container Runtime**: Validates that containers can be created and executed
+- **Network Access**: Ensures container registry access for pulling images (when needed)
+
+**Note**: Individual language/framework binaries (cargo, bats, etc.) are provided by the test containers themselves and are not required on the host system. Binary availability is verified at container runtime, not during platform detection.
 
 ### 5. Language Metadata Collection
 
@@ -122,13 +124,17 @@ The Platform Detector produces:
    - Build requirements
    - Execution capabilities
 
-3. **Binary Availability Status**: For each detected framework
-   - Required binaries found
-   - Required binaries missing
-   - Binary versions (if detectable)
+3. **Container Environment Status**: For each detected framework
+   - Docker daemon accessible and functional
+   - Required base images available or pullable
+   - Container runtime operational
+   - Network connectivity for image registries
 
 4. **Detection Warnings**: Issues encountered during detection
-   - Framework detected but tools unavailable
+   - Framework detected but container environment unavailable
+   - Docker daemon not accessible or not running
+   - Required base images not accessible
+   - Network connectivity issues for container registries
    - Multiple versions of same framework detected
    - Conflicting framework configurations
    - Ambiguous detection results
@@ -152,7 +158,7 @@ The Platform Detector works in conjunction with the Suitey Modules System:
 The Platform Detector uses these module methods:
 
 - **`detect(project_root)`**: Detects if language/framework is present, returns detection results
-- **`check_binaries(project_root)`**: Verifies required tools are available
+- **`check_container_environment(project_root)`**: Verifies container environment is ready for execution
 - **`get_metadata()`**: Returns language metadata for downstream use
 
 ## Error Handling

@@ -300,7 +300,7 @@ Suitey Modules are the core abstraction that enables language-agnostic test exec
 
 1. **Language Modules** (`/mod/languages/{name}/`): Detect programming languages and provide language-level capabilities
    - Examples: Rust, Python, JavaScript, Bash
-   - Responsibilities: Language detection, language-specific metadata, binary checking
+   - Responsibilities: Language detection, language-specific metadata, container environment verification
 
 2. **Framework Modules** (`/mod/frameworks/{name}/`): Handle framework-specific operations for test discovery, execution, and parsing
    - Examples: Cargo (Rust), pytest (Python), Jest (JavaScript), BATS (Bash)

@@ -238,27 +238,28 @@ teardown() {
     if [[ -f "mod/languages/rust/mod.sh" ]]; then
         source "mod/languages/rust/mod.sh"
         register_module "rust-module" "rust-module"
-        
+
         # Create a temporary directory with Cargo.toml
         local test_dir
         test_dir=$(mktemp -d)
         echo "name = \"test\"" > "$test_dir/Cargo.toml"
-        
+
         # Run detect_platforms()
         local result
         result=$(detect_platforms "$test_dir")
-        
+
         # Validate return format (should contain key=value pairs)
         run validate_module_return_format "$result"
         assert_success
-        
+
         # Should contain key=value pairs
         assert echo "$result" | grep -q "="
-        
+
         # Cleanup
         rm -rf "$test_dir"
     else
         skip "Rust module not found"
     fi
 }
+
 

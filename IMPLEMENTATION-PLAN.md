@@ -488,14 +488,19 @@ This requirement applies to all phases and ensures code quality and test coverag
   - Aggregate results
 - [x] **Refactor**: Improve error handling, optimize detection order
 
-**2.1.2 Binary Availability Checking**
-*Verify that required binaries (e.g., cargo, bats) are available for detected platforms, skip with warning if missing.*
-- [ ] **Red**: Write tests for binary checking
-  - Test: Verify `cargo` is available for Rust projects
-  - Test: Verify `bats` is available for BATS projects
-  - Test: Handle missing binaries gracefully (skip platform with warning)
-- [ ] **Green**: Implement binary checking using module's `check_binaries()` method
-- [ ] **Refactor**: Improve binary detection, add version checking
+**2.1.2 Container Environment Verification**
+*Verify that Docker/container environment is properly configured for test execution, skip with warning if containers cannot be used.*
+- [ ] **Red**: Write tests for container environment verification
+  - Test: Verify Docker daemon is running and accessible
+  - Test: Verify basic container operations work (create, run, remove)
+  - Test: Handle Docker unavailability gracefully (skip with warning)
+  - Test: Check network connectivity for image pulls
+- [ ] **Green**: Implement container environment checking
+  - Check Docker daemon status
+  - Verify basic container operations
+  - Test image pull capability (if needed)
+  - Provide clear error messages for container issues
+- [ ] **Refactor**: Improve container environment detection and error handling
 
 **2.1.3 Detection Confidence Levels**
 *Calculate confidence levels (high/medium/low) based on presence of config files, test files, and file extensions.*
@@ -518,7 +523,8 @@ This requirement applies to all phases and ensures code quality and test coverag
 **Acceptance Criteria**:
 - Can detect Rust and Bash/BATS projects
 - Returns structured detection results (flat data format)
-- Handles missing tools gracefully
+- Verifies container environment readiness for test execution
+- Handles Docker/container unavailability gracefully with clear warnings
 - Respects filesystem isolation (read-only project access)
 
 ---

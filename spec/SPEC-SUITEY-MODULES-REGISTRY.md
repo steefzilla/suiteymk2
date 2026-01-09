@@ -146,16 +146,15 @@ All Suitey Modules must implement a consistent interface that defines the contra
     - `language=rust/bash/etc` - Detected language
     - `frameworks_0=cargo/bats/etc` - Supported frameworks for this language
 
-- **`check_binaries(project_root: string) -> BinaryStatus`**
-  - Verifies that required framework tools are available
-  - Checks for framework executables in PATH or containers
-  - Returns binary status as flat data:
-    - `available=true/false` - Whether required binaries are available
-    - `binaries_0=...` - List of required binaries with availability status
-    - `binaries_1=...`
-    - `binaries_count=N`
-    - `versions_binary1=...` - Binary versions (if detectable)
-    - `container_check=true/false` - Whether to check in containers
+- **`check_container_environment(project_root: string) -> ContainerStatus`**
+  - Verifies that the container environment is ready for test execution
+  - Checks Docker daemon accessibility and basic container operations
+  - Returns container environment status as flat data:
+    - `docker_available=true/false` - Whether Docker daemon is accessible
+    - `container_operations=true/false` - Whether basic container operations work
+    - `network_access=true/false` - Whether network connectivity allows image pulls
+    - `base_images_available=true/false` - Whether required base images are accessible
+    - `container_check=true` - Always checks container environment (not host binaries)
 
 #### 2. Discovery Methods
 
