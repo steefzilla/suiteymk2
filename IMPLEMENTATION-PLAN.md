@@ -456,14 +456,29 @@ This requirement applies to all phases and ensures code quality and test coverag
   - Add project module registration
 - [x] **Refactor**: Improve project module integration
 
+### 1.2.10 Tool Module Support**
+*Add support for tool modules that describe when and how to use external tools for building, testing, or code quality.*
+- [ ] **Red**: Write tests for tool module support
+  - Test: Tool module can detect when external tools are needed
+  - Test: Tool module provides container requirements and commands
+  - Test: Tool modules integrate with detection and execution phases
+- [ ] **Green**: Implement tool module support
+  - Add tool module type to registry
+  - Update detection flow to include tool scanning
+  - Implement tool orchestration in build/validation phases
+- [ ] **Refactor**: Improve tool module integration
+
 **Acceptance Criteria**:
-- Registry can register and retrieve modules of all three types (language, framework, project)
-- Interface validation works correctly for all module types
-- At least two language modules (Rust, Bash) can be registered
-- At least two framework modules (Cargo, BATS) can be registered
-- Module type-based lookup works correctly
-- Module priority system works (project > framework > language)
+- Registry can register and retrieve modules of all four types (language, framework, project, tool)
+- Tool modules can describe when to use external tools (ShellCheck, Playwright, etc.)
+- Tool modules provide container requirements and execution commands
+- Tool detection integrates with existing detection flow
+- At least one tool module (ShellCheck) can be registered
 - All registry operations respect filesystem isolation (only `/tmp`)
+
+**Supported Tools Overview**:
+- **Frameworks**: Cargo (Rust), BATS (Bash) - language-specific testing/building
+- **Tools**: ShellCheck (shell script quality), Playwright (cross-platform testing) - external tool orchestration
 
 ---
 
@@ -572,13 +587,39 @@ This requirement applies to all phases and ensures code quality and test coverag
 - [x] **Refactor**: Improve discovery logic, handle edge cases
 
 **2.2.2 Suite Grouping**
-*Group discovered test files into distinct test suites (e.g., one suite per BATS file, unit vs integration for Rust).*
-- [ ] **Red**: Write tests for suite grouping
-  - Test: Group BATS files by file using `./example/bats-project/tests/bats/` (one suite per file)
-  - Test: Group Rust tests by type using `./example/rust-project/` (unit vs integration)
-  - Test: Handle multiple test suites per platform using example projects
-- [ ] **Green**: Implement suite grouping logic
-- [ ] **Refactor**: Improve grouping strategies
+*Group discovered test files into distinct test suites using adaptive detection strategies that preserve user organization.*
+
+**Detection Strategies** (in priority order):
+1. **Configuration-Driven**: Check for explicit suite configuration files (`suitey.toml`, `.suiteyrc`)
+2. **Convention-Based**: Recognize standard directory names (`unit/`, `integration/`, `e2e/`, etc.)
+3. **Subdirectory-Aware**: Group by subdirectory structure (preserves user organization)
+4. **Directory-Based**: Group all files in a directory as one suite
+5. **File-Level**: Each test file becomes its own suite (fallback)
+
+**Examples**:
+- `tests/bats/unit/` → suite "unit" (preserves user organization)
+- `tests/bats/integration/` → suite "integration"
+- `tests/bats/` with loose files → suite "bats" (directory-based)
+- `suitey.toml` with custom suites → user-defined suites
+
+**Adaptive Logic**:
+- Detect organizational patterns automatically
+- Prefer subdirectory grouping when conventional structure exists
+- Fall back to simpler grouping for flat structures
+- Allow explicit configuration to override detection
+
+- [ ] **Red**: Write tests for adaptive suite grouping
+  - Test: Configuration-driven grouping (`suitey.toml` defines suites)
+  - Test: Convention-based grouping (unit/integration/e2e directories)
+  - Test: Subdirectory-aware grouping (preserves user hierarchy)
+  - Test: Directory-based fallback for flat structures
+  - Test: File-level fallback for single files
+- [ ] **Green**: Implement adaptive detection algorithm
+  - Check for configuration files first
+  - Detect conventional directory patterns
+  - Analyze subdirectory structure
+  - Apply appropriate grouping strategy
+- [ ] **Refactor**: Optimize detection logic, add configuration file support
 
 **2.2.3 Test Counting**
 *Count individual tests in test files (e.g., @test annotations in BATS, #[test] functions in Rust) using module parsing.*

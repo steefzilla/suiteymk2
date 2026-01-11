@@ -85,13 +85,19 @@ The core functionality follows a clear workflow: **Platform Detection** → **Te
    - Falls back gracefully if platform-specific tools are not available
 
 2. **Test Suite Detection**
-   - After frameworks are detected, discovers test files and groups them into test suites
+   - After frameworks are detected, discovers test files and groups them into test suites using adaptive detection strategies
    - Uses Suitey Modules to find test files through framework-specific heuristics:
      - Test directory patterns (`./test/`, `./tests/`, etc.)
      - File naming patterns: `test_*.*`, `*_test.*`, etc.
      - Framework-specific patterns (e.g., `#[cfg(test)]` for Rust, `@test` for BATS)
-   - Each test suite is identifiable as a distinct unit (by framework, directory, or file)
-   - Framework-agnostic: works with Rust and BATS
+   - **Applies intelligent grouping based on project structure**:
+     - Configuration-driven (explicit suite definitions in `suitey.toml`)
+     - Convention-based (unit/integration/e2e directories)
+     - Subdirectory-aware (preserves user hierarchy)
+     - Directory-based (all files in directory as one suite)
+     - File-level (each file as separate suite)
+   - Each test suite is identifiable as a distinct unit with proper metadata
+   - Framework-agnostic: works with any testing framework using pluggable detection
 
 3. **Build System Detection & Automation**
    - Automatically detects if a project requires building before tests can run
@@ -324,6 +330,93 @@ Each module implements a consistent interface:
 Supported languages and frameworks:
 - Rust: Cargo framework
 - Bash/Shell: BATS framework
+- Code Quality: ShellCheck tool (static analysis for shell scripts)
+
+### Adaptive Test Suite Detection
+
+Suitey implements intelligent test suite detection that adapts to different project organizational patterns:
+
+#### Detection Strategies (Priority Order)
+
+1. **Configuration-Driven Grouping**
+   - Checks for explicit suite definitions in `suitey.toml` or `.suiteyrc`
+   - Allows users to define custom suite names and file groupings
+   - Overrides automatic detection when present
+
+2. **Convention-Based Grouping**
+   - Recognizes standard directory naming patterns:
+     - `unit/`, `units/` → "Unit Tests" suite
+     - `integration/`, `integrations/` → "Integration Tests" suite
+     - `e2e/`, `end-to-end/` → "End-to-End Tests" suite
+     - `performance/`, `perf/` → "Performance Tests" suite
+   - Framework-agnostic semantic grouping
+
+3. **Subdirectory-Aware Grouping**
+   - Preserves user-defined hierarchical organization
+   - Each subdirectory with test files becomes its own suite
+   - Maintains logical grouping (unit/integration separation)
+   - Example: `tests/bats/unit/` → "unit" suite, `tests/bats/integration/` → "integration" suite
+
+4. **Directory-Based Grouping**
+   - Groups all test files in a directory as one suite
+   - Uses directory basename as suite name
+   - Fallback for projects without clear subdirectory structure
+
+5. **File-Level Grouping**
+   - Each individual test file becomes its own suite
+   - Uses filename (without extension) as suite name
+   - Maximum granularity fallback
+
+#### Adaptive Detection Algorithm
+
+```bash
+detect_suite_structure() {
+    local project_root="$1"
+
+    # 1. Check for explicit configuration
+    if [[ -f "$project_root/suitey.toml" ]] || [[ -f "$project_root/.suiteyrc" ]]; then
+        return CONFIGURATION_BASED
+    fi
+
+    # 2. Check for conventional subdirectories
+    if has_conventional_dirs "$project_root"; then
+        return CONVENTION_BASED
+    fi
+
+    # 3. Check for deep hierarchical structure
+    if has_organized_subdirs "$project_root"; then
+        return SUBDIRECTORY_BASED
+    fi
+
+    # 4. Default to directory-based grouping
+    return DIRECTORY_BASED
+}
+```
+
+#### Benefits
+
+- **User Intent Preservation**: Maintains developer-chosen organization
+- **Framework Agnostic**: Works across different testing frameworks
+- **Flexible Fallbacks**: Adapts to any project structure
+- **Explicit Override**: Configuration files allow complete control
+- **Convention Awareness**: Recognizes common testing patterns
+
+#### Configuration File Format (suitey.toml)
+
+```toml
+# Explicit suite definitions override automatic detection
+[[suites]]
+name = "unit"
+files = ["tests/**/*.test.js", "src/**/*_test.go"]
+
+[[suites]]
+name = "integration"
+files = ["tests/integration/**/*"]
+
+[[suites]]
+name = "e2e"
+files = ["tests/e2e/**/*.spec.js"]
+```
 
 ### Containerized Execution
 

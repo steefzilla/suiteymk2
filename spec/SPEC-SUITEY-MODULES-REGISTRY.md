@@ -83,23 +83,46 @@ Project modules handle **project-specific configurations and customizations**. T
 
 **Priority:** Project modules have the highest priority and can override language and framework module behavior when present. They are typically detected last and take precedence.
 
+### 4. Tool Modules (`/mod/tools/{name}/`)
+
+Tool modules handle **external tool orchestration** for specific development tasks like code quality, testing, or specialized operations. Unlike framework modules which are tied to programming languages, tool modules can work across multiple languages and frameworks.
+
+**Examples:**
+- `mod/tools/shellcheck/mod.sh` - Orchestrates ShellCheck for shell script analysis
+- `mod/tools/playwright/mod.sh` - Orchestrates Playwright for cross-platform web testing
+- `mod/tools/k6/mod.sh` - Orchestrates k6 for load testing
+
+**Responsibilities:**
+- Detect when external tools are needed or applicable
+- Specify container requirements for tool execution
+- Provide commands and configuration for tool usage
+- Parse tool output and results
+- Handle tool-specific error conditions and edge cases
+
+**Key Difference from Framework Modules:** Tool modules orchestrate **external tools** (like ShellCheck, Playwright) rather than being frameworks themselves. They describe how to use tools, not implement testing frameworks.
+
+**Integration:** Tool modules integrate with the detection and execution phases, providing additional capabilities beyond language-specific frameworks.
+
 ### Module Interaction and Priority
 
-Modules interact in a hierarchical manner:
+Modules interact in a coordinated manner across the Suitey workflow:
 
 1. **Language Detection**: Language modules detect which languages are present
 2. **Framework Selection**: Framework modules are selected based on detected languages
-3. **Project Customization**: Project modules override or extend behavior as needed
+3. **Tool Detection**: Tool modules detect when external tools are applicable
+4. **Project Customization**: Project modules override or extend behavior as needed
 
 **Priority Order (highest to lowest):**
 1. Project modules (highest priority - can override everything)
-2. Framework modules (provide framework-specific behavior)
-3. Language modules (provide language-level detection)
+2. Tool modules (orchestrate external tools)
+3. Framework modules (provide framework-specific behavior)
+4. Language modules (provide language-level detection)
 
 **Example Workflow:**
 1. Language module (`rust`) detects Rust is present
 2. Framework module (`cargo`) handles Cargo-specific test discovery and execution
-3. Project module (`my-project`) may override specific behaviors for this project
+3. Tool module (`shellcheck`) detects shell scripts and orchestrates code quality checking
+4. Project module (`my-project`) may override specific behaviors for this project
 
 ## Responsibilities
 
@@ -254,7 +277,7 @@ All Suitey Modules must implement a consistent interface that defines the contra
     - `required_binaries_0=...` - Required binaries
     - `required_binaries_1=...`
     - `required_binaries_count=N`
-    - `priority=N` - Module priority (higher = more precedence, defaults to 0 for language, 1 for framework, 2 for project)
+    - `priority=N` - Module priority (higher = more precedence, defaults to 0 for language, 1 for framework/tool, 2 for project)
 
 ### Interface Compliance
 
@@ -282,6 +305,10 @@ Built-in modules are registered automatically when the Suitey Modules Registry i
 **Project Modules:**
 - Project modules are optional and are typically discovered in the project directory itself
 - They can be placed in the project root (e.g., `.suitey/mod/projects/{name}/mod.sh`) or in the Suitey installation
+
+**Tool Modules:**
+- Tool modules orchestrate external development tools for specialized tasks
+- Examples: ShellCheck (shell script analysis), Playwright (cross-platform testing)
 
 ### 2. Registration Process
 
