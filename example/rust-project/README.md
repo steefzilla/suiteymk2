@@ -19,3 +19,4 @@ This project demonstrates:
 - Unit tests in `src/`
 - Integration tests in `tests/`
 - Suitey should detect this as a "Rust project with high confidence"
+

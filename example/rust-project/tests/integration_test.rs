@@ -18,3 +18,4 @@ fn test_integration_even_check() {
         assert_eq!(is_even(num), expected, "Failed for number: {}", num);
     }
 }
+

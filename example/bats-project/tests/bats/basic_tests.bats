@@ -35,3 +35,4 @@ teardown() {
     [ "$output" = "test content" ]
     rm -f "$temp_file"
 }
+

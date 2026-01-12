@@ -37,3 +37,4 @@ load 'test_helper/bats-assert/load'
     [ "${test_array[1]}" = "bats" ]
     [ "${test_array[2]}" = "test" ]
 }
+

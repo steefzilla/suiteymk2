@@ -40,3 +40,4 @@ mod tests {
         assert!(!is_even(-1));
     }
 }
+
