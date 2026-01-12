@@ -1067,12 +1067,12 @@ get_metadata() {
 "
     eval "$lang_module"
     register_module "rust-lang" "rust-lang"
-    
+
     # Clean up functions
     for method in detect check_binaries discover_test_suites detect_build_requirements get_build_steps execute_test_suite parse_test_results get_metadata; do
         unset -f "$method" 2>/dev/null || true
     done
-    
+
     local framework_module="
 detect() { echo 'detected=true'; }
 check_binaries() { echo 'available=true'; }
@@ -1093,12 +1093,12 @@ get_metadata() {
 "
     eval "$framework_module"
     register_module "cargo-fw" "cargo-fw"
-    
+
     # Clean up functions
     for method in detect check_binaries discover_test_suites detect_build_requirements get_build_steps execute_test_suite parse_test_results get_metadata; do
         unset -f "$method" 2>/dev/null || true
     done
-    
+
     local project_module="
 detect() { echo 'detected=true'; }
 check_binaries() { echo 'available=true'; }
@@ -1119,25 +1119,306 @@ get_metadata() {
 "
     eval "$project_module"
     register_module "my-project" "my-project"
-    
+
     # Verify all modules are registered
     run get_all_modules
     assert_success
     assert_output --partial "rust-lang"
     assert_output --partial "cargo-fw"
     assert_output --partial "my-project"
-    
+
     # Verify type-based lookup works
     run get_modules_by_type "language"
     assert_success
     assert_output --partial "rust-lang"
-    
+
     run get_modules_by_type "framework"
     assert_success
     assert_output --partial "cargo-fw"
-    
+
     run get_modules_by_type "project"
     assert_success
     assert_output --partial "my-project"
+}
+
+# Tool Module Support Tests
+
+@test "register_module() accepts tool module with module_type=tool" {
+    local tool_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=tool'
+    echo 'language=shell'
+    echo 'frameworks_count=0'
+    echo 'project_type=code-quality'
+    echo 'version=0.1.0'
+    echo 'capabilities_0=code-quality'
+    echo 'capabilities_count=1'
+    echo 'required_binaries_count=0'
+}
+"
+
+    eval "$tool_module"
+
+    # Register the tool module
+    register_module "shellcheck-tool" "shellcheck-tool"
+    local register_status=$?
+    assert_equal "$register_status" 0
+
+    # Verify module is registered
+    run get_module "shellcheck-tool"
+    assert_success
+    assert_output "shellcheck-tool"
+}
+
+@test "get_modules_by_type() returns tool modules" {
+    # Register tool module
+    local tool_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=tool'
+    echo 'language=shell'
+    echo 'frameworks_count=0'
+    echo 'project_type=code-quality'
+    echo 'version=0.1.0'
+    echo 'capabilities_0=code-quality'
+    echo 'capabilities_count=1'
+    echo 'required_binaries_count=0'
+}
+"
+    eval "$tool_module"
+    register_module "shellcheck-tool" "shellcheck-tool"
+
+    # Get tool modules
+    run get_modules_by_type "tool"
+    assert_success
+    assert_output --partial "shellcheck-tool"
+}
+
+@test "get_tool_modules() returns tool modules" {
+    # Register tool module
+    local tool_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=tool'
+    echo 'language=shell'
+    echo 'frameworks_count=0'
+    echo 'project_type=code-quality'
+    echo 'version=0.1.0'
+    echo 'capabilities_0=code-quality'
+    echo 'capabilities_count=1'
+    echo 'required_binaries_count=0'
+}
+"
+    eval "$tool_module"
+    register_module "shellcheck-tool" "shellcheck-tool"
+
+    # Get tool modules using convenience function
+    run get_tool_modules
+    assert_success
+    assert_output --partial "shellcheck-tool"
+}
+
+@test "tool module can detect when external tools are needed" {
+    local tool_module="
+detect() {
+    echo 'detected=true'
+    echo 'confidence=high'
+    echo 'indicators_count=1'
+    echo 'indicators_0=.sh files present'
+    echo 'language=shell'
+    echo 'frameworks_count=0'
+}
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=tool'
+    echo 'language=shell'
+    echo 'frameworks_count=0'
+    echo 'project_type=code-quality'
+    echo 'version=0.1.0'
+    echo 'capabilities_0=code-quality'
+    echo 'capabilities_count=1'
+    echo 'required_binaries_count=0'
+}
+"
+
+    eval "$tool_module"
+    register_module "shellcheck-tool" "shellcheck-tool"
+
+    # Test detection capability
+    local result
+    result=$(detect "/tmp")
+    assert echo "$result" | grep -q "detected=true"
+    assert echo "$result" | grep -q "language=shell"
+}
+
+@test "tool module provides container requirements and commands" {
+    local tool_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() {
+    echo 'suites_count=1'
+    echo 'suites_0_name=shellcheck'
+    echo 'suites_0_framework=code-quality'
+    echo 'suites_0_test_files_0=script.sh'
+    echo 'suites_0_test_files_count=1'
+    echo 'suites_0_metadata_0=container_image=koalaman/shellcheck:latest'
+    echo 'suites_0_metadata_1=command=shellcheck --format=json script.sh'
+    echo 'suites_0_metadata_count=2'
+    echo 'suites_0_execution_config_count=0'
+}
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() {
+    echo 'exit_code=0'
+    echo 'duration=1.5'
+    echo 'output={\"file\":\"script.sh\",\"line\":1,\"column\":1,\"level\":\"error\",\"code\":1001,\"message\":\"SC1001: This is an error\"}'
+    echo 'container_id=abc123'
+    echo 'execution_method=docker'
+    echo 'test_image=koalaman/shellcheck:latest'
+}
+parse_test_results() {
+    echo 'total_tests=1'
+    echo 'passed_tests=0'
+    echo 'failed_tests=1'
+    echo 'skipped_tests=0'
+    echo 'test_details_0=SC1001: This is an error'
+    echo 'test_details_count=1'
+    echo 'status=failed'
+}
+get_metadata() {
+    echo 'module_type=tool'
+    echo 'language=shell'
+    echo 'frameworks_count=0'
+    echo 'project_type=code-quality'
+    echo 'version=0.1.0'
+    echo 'capabilities_0=code-quality'
+    echo 'capabilities_count=1'
+    echo 'required_binaries_count=0'
+}
+"
+
+    eval "$tool_module"
+    register_module "shellcheck-tool" "shellcheck-tool"
+
+    # Test container requirements in discovery
+    local suites
+    suites=$(discover_test_suites "/tmp")
+    assert echo "$suites" | grep -q "container_image=koalaman/shellcheck:latest"
+    assert echo "$suites" | grep -q "command=shellcheck --format=json script.sh"
+
+    # Test execution provides container info
+    local execution_result
+    execution_result=$(execute_test_suite "dummy_suite" "dummy_image" "dummy_config")
+    assert echo "$execution_result" | grep -q "container_id=abc123"
+    assert echo "$execution_result" | grep -q "execution_method=docker"
+    assert echo "$execution_result" | grep -q "test_image=koalaman/shellcheck:latest"
+
+    # Test result parsing
+    local parsed_results
+    parsed_results=$(parse_test_results "dummy_output" 1)
+    assert echo "$parsed_results" | grep -q "total_tests=1"
+    assert echo "$parsed_results" | grep -q "failed_tests=1"
+    assert echo "$parsed_results" | grep -q "status=failed"
+}
+
+@test "tool modules integrate with detection and execution phases" {
+    # Register a language module
+    local lang_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() { echo 'suites_count=0'; }
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=language'
+    echo 'language=shell'
+    echo 'frameworks_count=0'
+    echo 'project_type=test'
+    echo 'version=0.1.0'
+    echo 'capabilities_count=0'
+    echo 'required_binaries_count=0'
+}
+"
+    eval "$lang_module"
+    register_module "shell-lang" "shell-lang"
+
+    # Clean up functions
+    for method in detect check_binaries discover_test_suites detect_build_requirements get_build_steps execute_test_suite parse_test_results get_metadata; do
+        unset -f "$method" 2>/dev/null || true
+    done
+
+    # Register a tool module
+    local tool_module="
+detect() { echo 'detected=true'; }
+check_binaries() { echo 'available=true'; }
+discover_test_suites() {
+    echo 'suites_count=1'
+    echo 'suites_0_name=shellcheck'
+    echo 'suites_0_framework=code-quality'
+    echo 'suites_0_test_files_0=test.sh'
+    echo 'suites_0_test_files_count=1'
+    echo 'suites_0_metadata_count=0'
+    echo 'suites_0_execution_config_count=0'
+}
+detect_build_requirements() { echo 'requires_build=false'; }
+get_build_steps() { echo 'build_steps_count=0'; }
+execute_test_suite() { echo 'exit_code=0'; }
+parse_test_results() { echo 'total_tests=0'; }
+get_metadata() {
+    echo 'module_type=tool'
+    echo 'language=shell'
+    echo 'frameworks_count=0'
+    echo 'project_type=code-quality'
+    echo 'version=0.1.0'
+    echo 'capabilities_0=code-quality'
+    echo 'capabilities_count=1'
+    echo 'required_binaries_count=0'
+}
+"
+    eval "$tool_module"
+    register_module "shellcheck-tool" "shellcheck-tool"
+
+    # Verify both language and tool modules are registered
+    run get_all_modules
+    assert_success
+    assert_output --partial "shell-lang"
+    assert_output --partial "shellcheck-tool"
+
+    # Verify type-based lookup works for both
+    run get_modules_by_type "language"
+    assert_success
+    assert_output --partial "shell-lang"
+    refute_output --partial "shellcheck-tool"
+
+    run get_modules_by_type "tool"
+    assert_success
+    assert_output --partial "shellcheck-tool"
+    refute_output --partial "shell-lang"
 }
 

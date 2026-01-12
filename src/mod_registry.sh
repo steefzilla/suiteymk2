@@ -333,7 +333,7 @@ get_capabilities() {
         # Extract capabilities from metadata using grep
         # Capabilities are stored as capabilities_0=..., capabilities_1=..., etc.
         local capabilities
-        capabilities=$(echo "$metadata" | grep "^capabilities_[0-9]*=" | sed 's/^capabilities_[0-9]*=//')
+        capabilities=$(echo "$metadata" | grep --color=never "^capabilities_[0-9]*=" | sed 's/^capabilities_[0-9]*=//')
         
         # Add capabilities to the list
         if [[ -n "$capabilities" ]]; then
@@ -376,7 +376,7 @@ get_modules_by_type() {
 
         # Extract module_type from metadata
         local metadata_type
-        metadata_type=$(echo "$metadata" | grep "^module_type=" | cut -d'=' -f2 || echo "")
+        metadata_type=$(echo "$metadata" | grep --color=never "^module_type=" | cut -d'=' -f2 || echo "")
         
         # Match module type (case-sensitive)
         if [[ "$metadata_type" == "$module_type" ]]; then
@@ -416,6 +416,14 @@ get_framework_modules() {
 # Returns: List of project module identifiers, one per line
 get_project_modules() {
     get_modules_by_type "project"
+    return 0
+}
+
+# Get tool modules (convenience method)
+# Usage: get_tool_modules
+# Returns: List of tool module identifiers, one per line
+get_tool_modules() {
+    get_modules_by_type "tool"
     return 0
 }
 
