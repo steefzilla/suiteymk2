@@ -966,16 +966,27 @@ create_minified_version() {
     cat > "$minified_file" << EOF
 #!/usr/bin/env bash
 E="$payload_hash"
-echo -n "File Integrity: "
+echo -n "File integrity...	"
+S1=\$(date +%s%N)
 P='$payload'
 A=\$(echo "\$P" | md5sum | cut -d' ' -f1)
 if [[ "\$A" != "\$E" ]]; then
 echo ✗
 exit 1
 fi
-echo "✓
-Unpacking..."
-eval "\$(echo "\$P" | base64 -d | xz -dc)"
+D1=\$((\$(date +%s%N) - S1))
+N=1000000
+printf "✓ (%.2f ms)\n" \$((D1 / \$N)).\$((D1 % \$N / 10000))
+echo -n "Unpacking Suitey...	"
+S2=\$(date +%s%N)
+U=\$(echo "\$P" | base64 -d | xz -dc)
+if [[ -z "\$U" ]]; then
+echo ✗
+exit 1
+fi
+D2=\$((\$(date +%s%N) - S2))
+printf "✓ (%.2f ms)\n" \$((D2 / \$N)).\$((D2 % \$N / 10000))
+eval "\$U"
 exit \$?
 EOF
 
