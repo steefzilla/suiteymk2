@@ -80,8 +80,8 @@ tests/bats/
 
 ### Test Dependencies
 ```bash
-# Install BATS and test libraries
-npm install -g bats bats-support bats-assert
+# Install BATS test framework
+npm install -g bats
 
 # Or using package managers
 # Ubuntu/Debian
@@ -94,6 +94,10 @@ brew install bats-core
 git clone https://github.com/bats-core/bats-core.git
 cd bats-core
 ./install.sh /usr/local
+
+# Test helper libraries (bats-support and bats-assert) are automatically
+# set up as git submodules and will be cloned when you clone the repository
+# with: git clone --recursive https://github.com/your-repo/suiteymk2.git
 ```
 
 ### Environment Setup

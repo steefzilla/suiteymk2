@@ -123,11 +123,13 @@ check_test_dependencies() {
                     ;;
                 "bats-support")
                     echo "  - bats-support library:" >&2
-                    echo "    git clone https://github.com/bats-core/bats-support.git tests/bats/unit/test_helper/bats-support" >&2
+                    echo "    This dependency is now automatically managed as a git submodule." >&2
+                    echo "    Use 'git submodule update --init --recursive' if missing." >&2
                     ;;
                 "bats-assert")
                     echo "  - bats-assert library:" >&2
-                    echo "    git clone https://github.com/bats-core/bats-assert.git tests/bats/unit/test_helper/bats-assert" >&2
+                    echo "    This dependency is now automatically managed as a git submodule." >&2
+                    echo "    Use 'git submodule update --init --recursive' if missing." >&2
                     ;;
             esac
         done
