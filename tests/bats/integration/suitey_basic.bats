@@ -218,3 +218,180 @@ teardown() {
     # Clean up
     rm -rf "$test_project_dir"
 }
+
+@test "Integration: Test Suite Detector integrates with Platform Detector on example projects" {
+    # Test with Rust example project
+    if [[ -d "example/rust-project" ]]; then
+        # Create a simple script to test the integration
+        local test_script
+        test_script="$(mktemp)"
+        cat > "$test_script" << 'EOF'
+#!/bin/bash
+# Source all required components
+source src/mod_registry.sh 2>/dev/null || exit 1
+source src/platform_detector.sh 2>/dev/null || exit 1
+source src/test_suite_detector.sh 2>/dev/null || exit 1
+
+# Initialize registry
+reset_registry
+
+# Register modules (simulate what suitey.sh does)
+if [[ -f "mod/languages/rust/mod.sh" ]]; then
+    source "mod/languages/rust/mod.sh" 2>/dev/null
+    register_module "rust-module" "rust-module" 2>/dev/null
+fi
+
+if [[ -f "mod/frameworks/cargo/mod.sh" ]]; then
+    source "mod/frameworks/cargo/mod.sh" 2>/dev/null
+    register_module "cargo-module" "cargo-module" 2>/dev/null
+fi
+
+# Test platform detection
+platform_result=$(detect_platforms "example/rust-project" 2>/dev/null)
+if [[ $? -ne 0 ]]; then
+    echo "Platform detection failed"
+    exit 1
+fi
+
+# Check if any platforms were detected
+platforms_count=$(echo "$platform_result" | grep "platforms_count=" | cut -d'=' -f2)
+if [[ -z "$platforms_count" ]] || [[ "$platforms_count" -eq 0 ]]; then
+    echo "No platforms detected"
+    exit 1
+fi
+
+# Test test suite detection with platform results
+suite_result=$(discover_test_suites "$platform_result" 2>/dev/null)
+if [[ $? -ne 0 ]]; then
+    echo "Suite detection failed"
+    exit 1
+fi
+
+# Verify we have suites
+suites_count=$(echo "$suite_result" | grep "suites_count=" | cut -d'=' -f2)
+if [[ -z "$suites_count" ]]; then
+    echo "Suite detection returned invalid result"
+    exit 1
+fi
+
+echo "Integration successful: $platforms_count platforms, $suites_count suites detected"
+EOF
+        chmod +x "$test_script"
+
+        run bash "$test_script"
+        assert_success
+        assert_output --partial "Integration successful"
+
+        rm -f "$test_script"
+    else
+        skip "example/rust-project not available"
+    fi
+}
+
+@test "Integration: Test Suite Detector handles platform detection failures gracefully" {
+    # Create a script to test error handling
+    local test_script
+    test_script="$(mktemp)"
+    cat > "$test_script" << 'EOF'
+#!/bin/bash
+source src/test_suite_detector.sh 2>/dev/null || exit 1
+
+# Test with empty platform data
+empty_result=$(discover_test_suites "" 2>/dev/null)
+empty_suites_count=$(echo "$empty_result" | grep "suites_count=" | cut -d'=' -f2)
+if [[ "$empty_suites_count" != "0" ]]; then
+    echo "Empty platform data should return 0 suites"
+    exit 1
+fi
+
+# Test with invalid platform data
+invalid_result=$(discover_test_suites "invalid_data" 2>/dev/null)
+invalid_suites_count=$(echo "$invalid_result" | grep "suites_count=" | cut -d'=' -f2)
+if [[ "$invalid_suites_count" != "0" ]]; then
+    echo "Invalid platform data should return 0 suites"
+    exit 1
+fi
+
+echo "Error handling successful"
+EOF
+    chmod +x "$test_script"
+
+    run bash "$test_script"
+    assert_success
+    assert_output --partial "Error handling successful"
+
+    rm -f "$test_script"
+}
+
+@test "Integration: Test Suite Detector only discovers tests for detected platforms" {
+    # Create a mixed project with both Rust and BATS files
+    if [[ -d "example/rust+bats" ]]; then
+        local test_script
+        test_script="$(mktemp)"
+        cat > "$test_script" << 'EOF'
+#!/bin/bash
+# Source all required components
+source src/mod_registry.sh 2>/dev/null || exit 1
+source src/platform_detector.sh 2>/dev/null || exit 1
+source src/test_suite_detector.sh 2>/dev/null || exit 1
+
+# Initialize registry
+reset_registry
+
+# Register modules (simulate what suitey.sh does)
+if [[ -f "mod/languages/rust/mod.sh" ]]; then
+    source "mod/languages/rust/mod.sh" 2>/dev/null
+    register_module "rust-module" "rust-module" 2>/dev/null
+fi
+
+if [[ -f "mod/frameworks/cargo/mod.sh" ]]; then
+    source "mod/frameworks/cargo/mod.sh" 2>/dev/null
+    register_module "cargo-module" "cargo-module" 2>/dev/null
+fi
+
+if [[ -f "mod/frameworks/bats/mod.sh" ]]; then
+    source "mod/frameworks/bats/mod.sh" 2>/dev/null
+    register_module "bats-module" "bats-module" 2>/dev/null
+fi
+
+# Test platform detection on mixed project
+platform_result=$(detect_platforms "example/rust+bats" 2>/dev/null)
+if [[ $? -ne 0 ]]; then
+    echo "Platform detection failed"
+    exit 1
+fi
+
+# Count detected platforms
+platforms_count=$(echo "$platform_result" | grep "platforms_count=" | cut -d'=' -f2)
+if [[ -z "$platforms_count" ]]; then
+    echo "Platform detection returned invalid result"
+    exit 1
+fi
+
+# Test test suite detection
+suite_result=$(discover_test_suites "$platform_result" 2>/dev/null)
+if [[ $? -ne 0 ]]; then
+    echo "Suite detection failed"
+    exit 1
+fi
+
+# Verify we have suites
+suites_count=$(echo "$suite_result" | grep "suites_count=" | cut -d'=' -f2)
+if [[ -z "$suites_count" ]]; then
+    echo "Suite detection returned invalid result"
+    exit 1
+fi
+
+echo "Multi-platform integration successful: $platforms_count platforms, $suites_count suites detected"
+EOF
+        chmod +x "$test_script"
+
+        run bash "$test_script"
+        assert_success
+        assert_output --partial "Multi-platform integration successful"
+
+        rm -f "$test_script"
+    else
+        skip "example/rust+bats not available"
+    fi
+}
