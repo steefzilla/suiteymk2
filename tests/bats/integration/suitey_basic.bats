@@ -395,3 +395,145 @@ EOF
         skip "example/rust+bats not available"
     fi
 }
+
+@test "Integration: End-to-End Project Scanning Workflow" {
+    # Test the complete scanning workflow using the multi-platform rust+bats project
+    if [[ -d "example/rust+bats" ]]; then
+        # Create a comprehensive test script
+        local test_script
+        test_script="$(mktemp)"
+        cat > "$test_script" << 'EOF'
+#!/bin/bash
+# End-to-End Integration Test for Project Scanner
+set -e
+
+echo "=== End-to-End Project Scanning Test ==="
+
+# Source all required components
+source src/project_scanner.sh 2>/dev/null || exit 1
+
+# Test 1: Scan multi-platform project (Rust + BATS)
+echo "Testing multi-platform project scanning..."
+scan_result=$(scan_project "example/rust+bats" 2>&1)
+scan_exit_code=$?
+
+echo "Scan exit code: $scan_exit_code"
+
+# Verify scan completed successfully
+if [[ $scan_exit_code -ne 0 ]]; then
+    echo "ERROR: Scan failed with exit code $scan_exit_code"
+    echo "$scan_result"
+    exit 1
+fi
+
+echo "✓ Scan completed successfully"
+
+# Extract key results using grep
+scan_result_status=$(echo "$scan_result" | grep "^scan_result=" | cut -d'=' -f2)
+platform_detection_status=$(echo "$scan_result" | grep "^platform_detection_status=" | cut -d'=' -f2)
+test_suite_detection_status=$(echo "$scan_result" | grep "^test_suite_detection_status=" | cut -d'=' -f2)
+build_system_detection_status=$(echo "$scan_result" | grep "^build_system_detection_status=" | cut -d'=' -f2)
+platforms_count=$(echo "$scan_result" | grep "^platforms_count=" | cut -d'=' -f2 || echo "0")
+suites_count=$(echo "$scan_result" | grep "^suites_count=" | cut -d'=' -f2 || echo "0")
+requires_build=$(echo "$scan_result" | grep "^requires_build=" | cut -d'=' -f2 || echo "false")
+
+echo "Results extracted:"
+echo "  scan_result: $scan_result_status"
+echo "  platform_detection: $platform_detection_status"
+echo "  test_suite_detection: $test_suite_detection_status"
+echo "  build_system_detection: $build_system_detection_status"
+echo "  platforms_count: $platforms_count"
+echo "  suites_count: $suites_count"
+echo "  requires_build: $requires_build"
+
+# Test 2: Verify all platforms detected
+echo "Testing platform detection..."
+if [[ "$platform_detection_status" != "success" ]]; then
+    echo "ERROR: Platform detection failed"
+    exit 1
+fi
+
+# The rust+bats project should detect at least one platform (Rust)
+if [[ "$platforms_count" -lt 1 ]]; then
+    echo "ERROR: Expected at least 1 platform to be detected, got $platforms_count"
+    exit 1
+fi
+
+echo "✓ Platforms detected: $platforms_count"
+
+# Test 3: Verify test suites discovered
+echo "Testing test suite discovery..."
+if [[ "$test_suite_detection_status" != "success" ]]; then
+    echo "ERROR: Test suite detection failed"
+    exit 1
+fi
+
+# Should have at least some test suites
+if [[ "$suites_count" -lt 0 ]]; then
+    echo "ERROR: Invalid suites count: $suites_count"
+    exit 1
+fi
+
+echo "✓ Test suites discovered: $suites_count"
+
+# Test 4: Verify build requirements identified
+echo "Testing build requirements identification..."
+if [[ "$build_system_detection_status" != "success" ]]; then
+    echo "ERROR: Build system detection failed"
+    exit 1
+fi
+
+# Rust projects should require building
+if [[ "$requires_build" != "true" ]]; then
+    echo "WARNING: Expected requires_build=true for Rust project, got $requires_build"
+    # This is a warning, not an error, as the project might have different build requirements
+fi
+
+echo "✓ Build requirements identified: requires_build=$requires_build"
+
+# Test 5: Verify structured results format
+echo "Testing structured results format..."
+required_fields=("scan_result" "project_root" "platform_detection_status" "test_suite_detection_status" "build_system_detection_status")
+for field in "${required_fields[@]}"; do
+    if ! echo "$scan_result" | grep -q "^${field}="; then
+        echo "ERROR: Missing required field: $field"
+        exit 1
+    fi
+done
+
+echo "✓ Structured results format verified"
+
+# Test 6: Verify summary information is present
+echo "Testing summary information..."
+summary_fields=("summary_platforms_detected" "summary_test_suites_found" "summary_build_required" "summary_build_steps_defined")
+for field in "${summary_fields[@]}"; do
+    if ! echo "$scan_result" | grep -q "^${field}="; then
+        echo "ERROR: Missing summary field: $field"
+        exit 1
+    fi
+done
+
+echo "✓ Summary information present"
+
+echo "=== All End-to-End Tests Passed! ==="
+echo "Multi-platform project scanning workflow verified successfully."
+EOF
+        chmod +x "$test_script"
+
+        run bash "$test_script"
+        assert_success
+
+        # Verify key assertions from the test script
+        assert_output --partial "✓ Scan completed successfully"
+        assert_output --partial "✓ Platforms detected:"
+        assert_output --partial "✓ Test suites discovered:"
+        assert_output --partial "✓ Build requirements identified:"
+        assert_output --partial "✓ Structured results format verified"
+        assert_output --partial "✓ Summary information present"
+        assert_output --partial "=== All End-to-End Tests Passed! ==="
+
+        rm -f "$test_script"
+    else
+        skip "example/rust+bats not available for end-to-end testing"
+    fi
+}

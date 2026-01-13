@@ -64,18 +64,23 @@ detect_build_requirements() {
                 ;;
         esac
 
-        # If module file exists, load it in a subshell to avoid function conflicts
+        # If module file exists, source it and call detect_build_requirements
         if [[ -n "$module_file" ]] && [[ -f "$module_file" ]]; then
+            # Clean up any existing module functions to avoid conflicts
+            for method in detect check_binaries discover_test_suites detect_build_requirements get_build_steps execute_test_suite parse_test_results get_metadata; do
+                unset -f "$method" 2>/dev/null || true
+            done
+
+            # Source the module
+            source "$module_file" 2>/dev/null || continue
+
             # Get the project root from the platform data
             local project_root
             project_root=$(data_get "$platform_data" "project_root" || echo ".")
 
-            # Execute the module's detect_build_requirements in a subshell
+            # Call the module's detect_build_requirements method
             local module_result
-            module_result=$(bash -c "
-                source '$module_file' 2>/dev/null
-                detect_build_requirements '$project_root' '$platform_data' 2>/dev/null
-            " || echo "requires_build=false")
+            module_result=$(detect_build_requirements "$project_root" "$platform_data" 2>/dev/null || echo "requires_build=false")
 
             # Check if this platform requires building
             local platform_requires_build
@@ -207,18 +212,23 @@ get_build_steps() {
                 ;;
         esac
 
-        # If module file exists, load it in a subshell to avoid function conflicts
+        # If module file exists, source it and call get_build_steps
         if [[ -n "$module_file" ]] && [[ -f "$module_file" ]]; then
+            # Clean up any existing module functions to avoid conflicts
+            for method in detect check_binaries discover_test_suites detect_build_requirements get_build_steps execute_test_suite parse_test_results get_metadata; do
+                unset -f "$method" 2>/dev/null || true
+            done
+
+            # Source the module
+            source "$module_file" 2>/dev/null || continue
+
             # Get the project root from the platform data
             local project_root
             project_root=$(data_get "$platform_data" "project_root" || echo ".")
 
-            # Execute the module's get_build_steps in a subshell
+            # Call the module's get_build_steps method
             local module_result
-            module_result=$(bash -c "
-                source '$module_file' 2>/dev/null
-                get_build_steps '$project_root' '$build_requirements' 2>/dev/null
-            " || echo "build_steps_count=0")
+            module_result=$(get_build_steps "$project_root" "$build_requirements" 2>/dev/null || echo "build_steps_count=0")
 
             # Check if this platform has build steps
             local build_steps_count

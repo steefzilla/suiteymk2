@@ -10,14 +10,9 @@ setup() {
     local project_root="$(cd "$test_dir/../../.." && pwd)"
     cd "$project_root"
 
-    # Source the project_scanner.sh file if it exists
+    # Source the project_scanner.sh file if it exists (it will source mod_registry.sh)
     if [[ -f "src/project_scanner.sh" ]]; then
         source "src/project_scanner.sh"
-    fi
-
-    # Source other required modules for integration testing
-    if [[ -f "src/mod_registry.sh" ]]; then
-        source "src/mod_registry.sh"
     fi
 }
 

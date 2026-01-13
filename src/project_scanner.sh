@@ -5,6 +5,7 @@
 # Provides unified interface for project analysis
 
 # Source required dependencies
+source "src/mod_registry.sh" 2>/dev/null || true
 source "src/platform_detector.sh" 2>/dev/null || true
 source "src/test_suite_detector.sh" 2>/dev/null || true
 source "src/build_system_detector.sh" 2>/dev/null || true
@@ -105,6 +106,38 @@ scan_project() {
         echo "error_message=Project root directory does not exist"
         return 1
     fi
+
+    # Initialize module registry
+    echo "Initializing module registry..." >&2
+    reset_registry
+
+    # Load and register available modules
+    if [[ -f "mod/languages/rust/mod.sh" ]]; then
+        source "mod/languages/rust/mod.sh" 2>/dev/null || echo "Warning: Failed to load rust module" >&2
+        register_module "rust-module" "rust-module" 2>/dev/null || echo "Warning: Failed to register rust module" >&2
+    fi
+
+    if [[ -f "mod/languages/bash/mod.sh" ]]; then
+        source "mod/languages/bash/mod.sh" 2>/dev/null || echo "Warning: Failed to load bash module" >&2
+        register_module "bash-module" "bash-module" 2>/dev/null || echo "Warning: Failed to register bash module" >&2
+    fi
+
+    if [[ -f "mod/frameworks/cargo/mod.sh" ]]; then
+        source "mod/frameworks/cargo/mod.sh" 2>/dev/null || echo "Warning: Failed to load cargo module" >&2
+        register_module "cargo-module" "cargo-module" 2>/dev/null || echo "Warning: Failed to register cargo module" >&2
+    fi
+
+    if [[ -f "mod/frameworks/bats/mod.sh" ]]; then
+        source "mod/frameworks/bats/mod.sh" 2>/dev/null || echo "Warning: Failed to load bats module" >&2
+        register_module "bats-module" "bats-module" 2>/dev/null || echo "Warning: Failed to register bats module" >&2
+    fi
+
+    if [[ -f "mod/tools/shellcheck/mod.sh" ]]; then
+        source "mod/tools/shellcheck/mod.sh" 2>/dev/null || echo "Warning: Failed to load shellcheck module" >&2
+        register_module "shellcheck-module" "shellcheck-module" 2>/dev/null || echo "Warning: Failed to register shellcheck module" >&2
+    fi
+
+    echo "Module registry initialized" >&2
 
     # Initialize result data
     local result=""
@@ -258,6 +291,17 @@ scan_project() {
             result=$(data_set "$result" "$key" "$value")
         fi
     done <<< "$dependency_data"
+
+    # Add summary information
+    local summary_platforms_detected=$(echo "$platform_data" | grep "^platforms_count=" | cut -d'=' -f2 || echo "0")
+    local summary_test_suites_found=$(echo "$suite_data" | grep "^suites_count=" | cut -d'=' -f2 || echo "0")
+    local summary_requires_build=$(echo "$build_data" | grep "^requires_build=" | cut -d'=' -f2 || echo "false")
+    local summary_build_steps_defined=$(echo "$build_steps_data" | grep "^build_steps_count=" | cut -d'=' -f2 || echo "0")
+
+    result=$(data_set "$result" "summary_platforms_detected" "$summary_platforms_detected")
+    result=$(data_set "$result" "summary_test_suites_found" "$summary_test_suites_found")
+    result=$(data_set "$result" "summary_build_required" "$summary_requires_build")
+    result=$(data_set "$result" "summary_build_steps_defined" "$summary_build_steps_defined")
 
     # Final status
     if [[ "$scan_success" == true ]]; then
