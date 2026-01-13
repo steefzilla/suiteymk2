@@ -121,11 +121,16 @@ scan_project() {
         result=$(data_set "$result" "platform_detection_status" "success")
         echo "Platform detection completed successfully" >&2
     else
+        local error_msg="Platform detection failed"
+        if [[ -n "$platform_data" ]]; then
+            error_msg="$error_msg: $platform_data"
+        fi
         result=$(data_set "$result" "platform_detection_status" "failed")
-        result=$(data_set "$result" "platform_detection_error" "$platform_data")
+        result=$(data_set "$result" "platform_detection_error" "$error_msg")
         result=$(data_set "$result" "scan_result" "partial")
         scan_success=false
-        echo "Platform detection failed: $platform_data" >&2
+        echo "$error_msg" >&2
+        echo "Continuing with other detection phases..." >&2
         # Continue with empty platform data for other phases
         platform_data="platforms_count=0"
     fi
@@ -146,11 +151,16 @@ scan_project() {
         result=$(data_set "$result" "test_suite_detection_status" "success")
         echo "Test suite detection completed successfully" >&2
     else
+        local error_msg="Test suite detection failed"
+        if [[ -n "$suite_data" ]]; then
+            error_msg="$error_msg: $suite_data"
+        fi
         result=$(data_set "$result" "test_suite_detection_status" "failed")
-        result=$(data_set "$result" "test_suite_detection_error" "$suite_data")
+        result=$(data_set "$result" "test_suite_detection_error" "$error_msg")
         result=$(data_set "$result" "scan_result" "partial")
         scan_success=false
-        echo "Test suite detection failed: $suite_data" >&2
+        echo "$error_msg" >&2
+        echo "Continuing with build system detection..." >&2
         # Continue with empty suite data
         suite_data="suites_count=0"
     fi
@@ -170,11 +180,16 @@ scan_project() {
         result=$(data_set "$result" "build_system_detection_status" "success")
         echo "Build system detection completed successfully" >&2
     else
+        local error_msg="Build system detection failed"
+        if [[ -n "$build_data" ]]; then
+            error_msg="$error_msg: $build_data"
+        fi
         result=$(data_set "$result" "build_system_detection_status" "failed")
-        result=$(data_set "$result" "build_system_detection_error" "$build_data")
+        result=$(data_set "$result" "build_system_detection_error" "$error_msg")
         result=$(data_set "$result" "scan_result" "partial")
         scan_success=false
-        echo "Build system detection failed: $build_data" >&2
+        echo "$error_msg" >&2
+        echo "Continuing with build steps detection..." >&2
         # Continue with safe defaults
         build_data="requires_build=false"$'\n'"build_commands_count=0"$'\n'"build_dependencies_count=0"$'\n'"build_artifacts_count=0"
     fi
@@ -194,11 +209,16 @@ scan_project() {
         result=$(data_set "$result" "build_steps_detection_status" "success")
         echo "Build steps detection completed successfully" >&2
     else
+        local error_msg="Build steps detection failed"
+        if [[ -n "$build_steps_data" ]]; then
+            error_msg="$error_msg: $build_steps_data"
+        fi
         result=$(data_set "$result" "build_steps_detection_status" "failed")
-        result=$(data_set "$result" "build_steps_detection_error" "$build_steps_data")
+        result=$(data_set "$result" "build_steps_detection_error" "$error_msg")
         result=$(data_set "$result" "scan_result" "partial")
         scan_success=false
-        echo "Build steps detection failed: $build_steps_data" >&2
+        echo "$error_msg" >&2
+        echo "Continuing with build dependency analysis..." >&2
         # Continue with empty build steps
         build_steps_data="build_steps_count=0"
     fi
@@ -218,11 +238,16 @@ scan_project() {
         result=$(data_set "$result" "build_dependency_analysis_status" "success")
         echo "Build dependency analysis completed successfully" >&2
     else
+        local error_msg="Build dependency analysis failed"
+        if [[ -n "$dependency_data" ]]; then
+            error_msg="$error_msg: $dependency_data"
+        fi
         result=$(data_set "$result" "build_dependency_analysis_status" "failed")
-        result=$(data_set "$result" "build_dependency_analysis_error" "$dependency_data")
+        result=$(data_set "$result" "build_dependency_analysis_error" "$error_msg")
         result=$(data_set "$result" "scan_result" "partial")
         scan_success=false
-        echo "Build dependency analysis failed: $dependency_data" >&2
+        echo "$error_msg" >&2
+        echo "Scan completed with some failures" >&2
         # Continue with safe defaults
         dependency_data="execution_order_count=0"$'\n'"parallel_groups_count=0"$'\n'"dependency_graph_count=0"
     fi

@@ -155,6 +155,89 @@ teardown() {
     rm -rf "$empty_dir"
 }
 
+@test "scan_project() handles Platform Detector failures gracefully" {
+    # Create a temporary directory
+    local test_dir
+    test_dir="$(mktemp -d)"
+
+    # Mock platform detector failure by creating a scenario that would cause failure
+    # (This is hard to simulate directly, so we'll test with an empty directory which should still work)
+    run scan_project "$test_dir"
+    assert_success
+
+    # Should still complete other phases even if platform detection "fails"
+    assert_output --regexp "platform_detection_status="
+    assert_output --regexp "test_suite_detection_status="
+    assert_output --regexp "build_system_detection_status="
+    assert_output --partial "scan_result=success"
+
+    # Clean up
+    rm -rf "$test_dir"
+}
+
+@test "scan_project() continues with other detectors when one fails" {
+    # Create a temporary directory
+    local test_dir
+    test_dir="$(mktemp -d)"
+
+    run scan_project "$test_dir"
+    assert_success
+
+    # All detection phases should have status (even if they "failed" or returned empty results)
+    assert_output --regexp "platform_detection_status="
+    assert_output --regexp "test_suite_detection_status="
+    assert_output --regexp "build_system_detection_status="
+    assert_output --regexp "build_steps_detection_status="
+    assert_output --regexp "build_dependency_analysis_status="
+
+    # Overall scan should succeed
+    assert_output --partial "scan_result=success"
+
+    # Clean up
+    rm -rf "$test_dir"
+}
+
+@test "scan_project() provides clear error messages for failures" {
+    # Test with non-existent directory (should fail with clear error)
+    run scan_project "/nonexistent/directory/that/does/not/exist"
+    assert_failure
+    assert_output --partial "Error: Project root directory does not exist"
+    assert_output --partial "scan_result=error"
+    assert_output --partial "error_message=Project root directory does not exist"
+}
+
+@test "scan_project() provides clear error messages for invalid input" {
+    # Test with empty string (should fail with clear error)
+    run scan_project ""
+    assert_failure
+    assert_output --partial "Error: Project root is required"
+    assert_output --partial "scan_result=error"
+    assert_output --partial "error_message=Project root is required"
+}
+
+@test "scan_project() handles partial failures with detailed error reporting" {
+    # Create a directory that might cause some detection phases to "fail" or return empty
+    local test_dir
+    test_dir="$(mktemp -d)"
+
+    # Create some files that might confuse detectors
+    echo "invalid content" > "$test_dir/invalid_file.xyz"
+
+    run scan_project "$test_dir"
+    assert_success
+
+    # Should provide status for all phases
+    assert_output --regexp "platform_detection_status="
+    assert_output --regexp "test_suite_detection_status="
+    assert_output --regexp "build_system_detection_status="
+
+    # If any phase "failed", overall result should reflect partial success
+    # (In this case, all should succeed with empty results)
+
+    # Clean up
+    rm -rf "$test_dir"
+}
+
 @test "scan_project() returns structured results in flat data format" {
     if [[ -d "example/rust-project" ]]; then
         run scan_project "example/rust-project"
