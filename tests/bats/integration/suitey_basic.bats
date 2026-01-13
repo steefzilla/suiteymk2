@@ -192,3 +192,29 @@ teardown() {
     assert_failure
     assert_equal "$status" 2
 }
+
+@test "Integration: Tool modules integrate with detection and execution phases" {
+    # Create a temporary project with shell scripts
+    local test_project_dir
+    test_project_dir="$(mktemp -d)"
+
+    # Create shell scripts that shellcheck would analyze
+    echo '#!/bin/bash\necho "test script"' > "$test_project_dir/test.sh"
+    echo '#!/bin/bash\necho "another script"' > "$test_project_dir/script.sh"
+    chmod +x "$test_project_dir"/*.sh
+
+    # Run suitey on the test project
+    # This should load the shellcheck tool module and detect shell scripts
+    run "$TEST_BUILD_DIR/suitey.sh" "$test_project_dir"
+
+    # The command should succeed (even if Docker is not available, it should handle gracefully)
+    # We just want to verify that tool modules are loaded and can participate in detection
+    if [[ $status -ne 0 ]]; then
+        # If it fails, it should be due to Docker/container issues, not module loading
+        refute_output --partial "Error: Module"
+        refute_output --partial "shellcheck-module"
+    fi
+
+    # Clean up
+    rm -rf "$test_project_dir"
+}

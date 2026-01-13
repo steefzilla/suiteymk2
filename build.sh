@@ -510,6 +510,11 @@ main() {
         register_module "bats-module" "bats-module" 2>/dev/null || true
     fi
 
+    if [[ -f "mod/tools/shellcheck/mod.sh" ]]; then
+        source "mod/tools/shellcheck/mod.sh" 2>/dev/null || true
+        register_module "shellcheck-module" "shellcheck-module" 2>/dev/null || true
+    fi
+
     # Perform platform detection
     echo "Suitey v0.1.0"
     echo "Analyzing project: $normalized_dir"

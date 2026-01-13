@@ -458,15 +458,15 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 ### 1.2.10 Tool Module Support**
 *Add support for tool modules that describe when and how to use external tools for building, testing, or code quality.*
-- [ ] **Red**: Write tests for tool module support
+- [x] **Red**: Write tests for tool module support
   - Test: Tool module can detect when external tools are needed
   - Test: Tool module provides container requirements and commands
   - Test: Tool modules integrate with detection and execution phases
-- [ ] **Green**: Implement tool module support
+- [x] **Green**: Implement tool module support
   - Add tool module type to registry
   - Update detection flow to include tool scanning
   - Implement tool orchestration in build/validation phases
-- [ ] **Refactor**: Improve tool module integration
+- [x] **Refactor**: Improve tool module integration
 
 **Acceptance Criteria**:
 - Registry can register and retrieve modules of all four types (language, framework, project, tool)

@@ -139,6 +139,12 @@ detect_platforms() {
             module_file="mod/frameworks/${framework}/mod.sh"
         fi
 
+        # If not a framework module, try tool modules
+        if [[ ! -f "$module_file" ]] && [[ "$module_id" == *"-module" ]]; then
+            local tool="${module_id%-module}"
+            module_file="mod/tools/${tool}/mod.sh"
+        fi
+
         # If not found, skip
         if [[ ! -f "$module_file" ]]; then
             continue
