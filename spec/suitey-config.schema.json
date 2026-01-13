@@ -1,0 +1,171 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://suitey.dev/schemas/suitey-config.schema.json",
+  "title": "Suitey Configuration File Schema",
+  "description": "Schema for suitey.toml and .suiteyrc configuration files",
+  "type": "object",
+  "properties": {
+    "suites": {
+      "type": "array",
+      "description": "Array of test suite definitions",
+      "items": {
+        "type": "object",
+        "required": ["name", "files"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Unique identifier for the test suite",
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "files": {
+            "type": "array",
+            "description": "Glob patterns matching test files for this suite",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "platform": {
+            "type": "string",
+            "description": "Restrict suite to specific platform (e.g., 'rust', 'bash')"
+          },
+          "framework": {
+            "type": "string",
+            "description": "Restrict suite to specific framework (e.g., 'cargo', 'bats')"
+          },
+          "exclude": {
+            "type": "array",
+            "description": "Glob patterns for files to exclude from this suite",
+            "items": {
+              "type": "string"
+            }
+          },
+          "parallel": {
+            "type": "boolean",
+            "description": "Allow parallel execution",
+            "default": true
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Maximum execution time in seconds",
+            "minimum": 1
+          },
+          "requires_build": {
+            "type": "boolean",
+            "description": "Whether this suite requires building first"
+          },
+          "build_steps": {
+            "type": "array",
+            "description": "Custom build commands for this suite",
+            "items": {
+              "type": "string"
+            }
+          },
+          "environment": {
+            "type": "object",
+            "description": "Environment variables for test execution",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Additional metadata key-value pairs",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "build": {
+      "type": "object",
+      "description": "Global build configuration",
+      "properties": {
+        "required": {
+          "type": "boolean",
+          "description": "Whether building is required"
+        },
+        "steps": {
+          "type": "array",
+          "description": "Global build commands",
+          "items": {
+            "type": "string"
+          }
+        },
+        "parallel": {
+          "type": "boolean",
+          "description": "Allow parallel builds",
+          "default": true
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Maximum build time in seconds",
+          "minimum": 1
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "description": "Global execution configuration",
+      "properties": {
+        "parallel": {
+          "type": "boolean",
+          "description": "Allow parallel test execution",
+          "default": true
+        },
+        "max_parallel": {
+          "type": "integer",
+          "description": "Maximum parallel test suites",
+          "minimum": 1
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Global timeout for all suites in seconds",
+          "minimum": 1
+        },
+        "retry_failed": {
+          "type": "integer",
+          "description": "Number of times to retry failed tests",
+          "minimum": 0,
+          "default": 0
+        }
+      }
+    },
+    "reporting": {
+      "type": "object",
+      "description": "Report generation configuration",
+      "properties": {
+        "format": {
+          "type": "array",
+          "description": "Report formats",
+          "items": {
+            "type": "string",
+            "enum": ["console", "html", "json"]
+          },
+          "default": ["console", "html"]
+        },
+        "output_dir": {
+          "type": "string",
+          "description": "Directory for report files",
+          "default": "/tmp/suitey-reports"
+        },
+        "serve": {
+          "type": "boolean",
+          "description": "Serve HTML report via HTTP",
+          "default": true
+        },
+        "port": {
+          "type": "integer",
+          "description": "Port for HTTP server",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 8080
+        }
+      }
+    }
+  },
+  "required": ["suites"]
+}
+

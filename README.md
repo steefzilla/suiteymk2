@@ -100,6 +100,8 @@ bats -j 4 tests/bats/unit/
 - **[Testing Guide](spec/TESTING.md)**: Comprehensive testing documentation
 - **[Implementation Plan](IMPLEMENTATION-PLAN.md)**: Project roadmap and architecture
 - **[Specifications](spec/)**: Detailed component specifications
+  - **[Configuration File Spec](spec/SPEC-CONFIG-FILE.md)**: Format for `suitey.toml` and `.suiteyrc`
+  - **[Data Conventions](spec/DATA-CONVENTIONS.md)**: Internal data format specification
 
 ## Contributing
 

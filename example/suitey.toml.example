@@ -1,0 +1,63 @@
+# Suitey Configuration File Example
+# Copy this file to your project root as `suitey.toml` or `.suiteyrc` to customize test suite detection
+
+# Test Suite Definitions
+# Each [[suites]] entry defines a test suite with its own name, file patterns, and configuration
+
+[[suites]]
+name = "unit"
+files = [
+    "tests/unit/**/*.bats",
+    "src/**/*_test.rs"
+]
+platform = "rust"
+parallel = true
+timeout = 300
+
+[[suites]]
+name = "integration"
+files = ["tests/integration/**/*"]
+exclude = ["tests/integration/legacy/**/*"]
+parallel = true
+requires_build = true
+
+[[suites]]
+name = "e2e"
+files = ["tests/e2e/**/*.spec.*"]
+platform = "bash"
+framework = "bats"
+parallel = false  # E2E tests run sequentially
+timeout = 600
+environment = { BROWSER = "chrome", HEADLESS = "true" }
+
+[[suites]]
+name = "code-quality"
+files = ["**/*.sh"]
+platform = "shell"
+framework = "shellcheck"
+parallel = true
+
+# Build Configuration (optional)
+# [build]
+# required = true
+# steps = [
+#     "cargo build --release",
+#     "npm run build"
+# ]
+# parallel = true
+# timeout = 1800
+
+# Execution Configuration (optional)
+# [execution]
+# parallel = true
+# max_parallel = 4
+# timeout = 3600
+# retry_failed = 1
+
+# Reporting Configuration (optional)
+# [reporting]
+# format = ["console", "html", "json"]
+# output_dir = "/tmp/suitey-reports"
+# serve = true
+# port = 8080
+

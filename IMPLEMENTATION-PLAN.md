@@ -591,6 +591,8 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **Detection Strategies** (in priority order):
 1. **Configuration-Driven**: Check for explicit suite configuration files (`suitey.toml`, `.suiteyrc`)
+   - See `spec/SPEC-CONFIG-FILE.md` for complete format specification
+   - Configuration files override all automatic detection
 2. **Convention-Based**: Recognize standard directory names (`unit/`, `integration/`, `e2e/`, etc.)
 3. **Subdirectory-Aware**: Group by subdirectory structure (preserves user organization)
 4. **Directory-Based**: Group all files in a directory as one suite
@@ -608,18 +610,25 @@ This requirement applies to all phases and ensures code quality and test coverag
 - Fall back to simpler grouping for flat structures
 - Allow explicit configuration to override detection
 
-- [ ] **Red**: Write tests for adaptive suite grouping
+- [x] **Red**: Write tests for adaptive suite grouping
   - Test: Configuration-driven grouping (`suitey.toml` defines suites)
+  - Test: Parse `suitey.toml` format (see `spec/SPEC-CONFIG-FILE.md`)
+  - Test: Parse `.suiteyrc` format (same as `suitey.toml`)
+  - Test: Validate configuration file schema
+  - Test: Handle invalid configuration files gracefully (fallback to auto-detection)
   - Test: Convention-based grouping (unit/integration/e2e directories)
   - Test: Subdirectory-aware grouping (preserves user hierarchy)
   - Test: Directory-based fallback for flat structures
   - Test: File-level fallback for single files
-- [ ] **Green**: Implement adaptive detection algorithm
-  - Check for configuration files first
+- [x] **Green**: Implement adaptive detection algorithm
+  - Check for configuration files first (`suitey.toml`, then `.suiteyrc`)
+  - Parse TOML configuration files (pure Bash implementation)
+  - Convert configuration to flat data format
+  - Validate configuration schema
   - Detect conventional directory patterns
   - Analyze subdirectory structure
   - Apply appropriate grouping strategy
-- [ ] **Refactor**: Optimize detection logic, add configuration file support
+- [x] **Refactor**: Optimize detection logic, add configuration file support
 
 **2.2.3 Test Counting**
 *Count individual tests in test files (e.g., @test annotations in BATS, #[test] functions in Rust) using module parsing.*

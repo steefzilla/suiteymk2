@@ -5,6 +5,7 @@
 
 # Source required dependencies
 source "src/data_access.sh" 2>/dev/null || true
+source "src/suite_grouping.sh" 2>/dev/null || true
 
 # Discover test suites for detected platforms
 # Directly loads and calls module discover_test_suites methods based on platform type
@@ -109,6 +110,57 @@ discover_test_suites() {
 
     # Update the final suites count
     result=$(data_set "$result" "suites_count" "$suite_index")
+
+    # Apply adaptive suite grouping if we have suites
+    if [[ "$suite_index" -gt 0 ]]; then
+        # Get project root from platform data
+        local project_root
+        project_root=$(data_get "$platform_data" "project_root" || echo ".")
+        
+        # Collect all test files from discovered suites
+        local all_test_files=""
+        local i=0
+        while [[ $i -lt "$suite_index" ]]; do
+            local files_count
+            files_count=$(data_get "$result" "suites_${i}_files_count")
+            
+            if [[ -n "$files_count" ]] && [[ "$files_count" -gt 0 ]]; then
+                local j=0
+                while [[ $j -lt "$files_count" ]]; do
+                    local test_file
+                    test_file=$(data_get "$result" "suites_${i}_files_${j}")
+                    if [[ -n "$test_file" ]]; then
+                        if [[ -z "$all_test_files" ]]; then
+                            all_test_files="$test_file"
+                        else
+                            all_test_files="${all_test_files}"$'\n'"$test_file"
+                        fi
+                    fi
+                    ((j++))
+                done
+            fi
+            ((i++))
+        done
+        
+        # Apply adaptive grouping if we have test files
+        if [[ -n "$all_test_files" ]]; then
+            local grouped_result
+            grouped_result=$(apply_adaptive_grouping "$project_root" "$all_test_files" 2>/dev/null)
+            
+            # If grouping produced results, use them (configuration-driven takes precedence)
+            if [[ $? -eq 0 ]] && [[ -n "$grouped_result" ]]; then
+                local grouped_count
+                grouped_count=$(data_get "$grouped_result" "suites_count")
+                
+                # Only use grouped result if configuration file exists (highest priority)
+                local config_file
+                config_file=$(has_configuration_file "$project_root" 2>/dev/null)
+                if [[ $? -eq 0 ]]; then
+                    result="$grouped_result"
+                fi
+            fi
+        fi
+    fi
 
     echo "$result"
 }
