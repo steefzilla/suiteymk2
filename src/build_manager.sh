@@ -55,8 +55,24 @@ launch_build_container() {
     docker_cmd="$docker_cmd -w $working_directory"
     
     # Set CPU cores if specified (0 means use all available)
+    # Use allocate_cpu_cores to handle allocation logic
+    local allocated_cores
     if [[ "$cpu_cores" != "0" ]] && [[ -n "$cpu_cores" ]]; then
-        docker_cmd="$docker_cmd --cpus=$cpu_cores"
+        local allocation_result
+        allocation_result=$(allocate_cpu_cores "$cpu_cores" 2>/dev/null || echo "")
+        if [[ -n "$allocation_result" ]]; then
+            allocated_cores=$(echo "$allocation_result" | grep "^allocated_cores=" | cut -d'=' -f2 || echo "$cpu_cores")
+        else
+            allocated_cores="$cpu_cores"
+        fi
+    else
+        # Use all available cores
+        allocated_cores=$(get_available_cpu_cores)
+    fi
+    
+    # Set CPU cores in Docker command
+    if [[ -n "$allocated_cores" ]] && [[ "$allocated_cores" != "0" ]]; then
+        docker_cmd="$docker_cmd --cpus=$allocated_cores"
     fi
     
     # Set container name if specified
@@ -362,6 +378,136 @@ execute_build_command() {
     echo "duration=$duration"
     echo "stdout=$stdout_content"
     echo "stderr=$stderr_content"
+
+    return 0
+}
+
+# Get available CPU cores on the system
+# Usage: get_available_cpu_cores
+# Returns: Number of available CPU cores as integer
+# Behavior: Detects CPU cores using nproc or fallback methods, handles single-core systems
+get_available_cpu_cores() {
+    local cores=1  # Default to 1 core
+
+    # Try nproc first (most reliable on Linux)
+    if command -v nproc >/dev/null 2>&1; then
+        cores=$(nproc 2>/dev/null || echo "1")
+    # Try sysctl on macOS/BSD
+    elif command -v sysctl >/dev/null 2>&1; then
+        cores=$(sysctl -n hw.ncpu 2>/dev/null || echo "1")
+    # Try /proc/cpuinfo on Linux
+    elif [[ -f /proc/cpuinfo ]]; then
+        cores=$(grep -c "^processor" /proc/cpuinfo 2>/dev/null || echo "1")
+    fi
+
+    # Ensure we have at least 1 core
+    if [[ -z "$cores" ]] || [[ "$cores" -lt 1 ]]; then
+        cores=1
+    fi
+
+    # Return as integer
+    echo "$cores"
+    return 0
+}
+
+# Get parallel build flags for a build system
+# Usage: get_parallel_build_flags <build_system>
+# Returns: Parallel build flags string (e.g., "-j4" for make, "--jobs 4" for cargo)
+# Behavior: Generates appropriate parallel flags based on build system and available cores
+get_parallel_build_flags() {
+    local build_system="$1"
+    local cores
+    cores=$(get_available_cpu_cores)
+
+    # Ensure we have at least 1 core
+    if [[ -z "$cores" ]] || [[ "$cores" -lt 1 ]]; then
+        cores=1
+    fi
+
+    case "$build_system" in
+        "cargo"|"rust")
+            # Cargo uses --jobs flag
+            echo "--jobs $cores"
+            ;;
+        "make"|"gmake")
+            # Make uses -j flag
+            echo "-j$cores"
+            ;;
+        "cmake")
+            # CMake uses -j flag with build command
+            echo "-j$cores"
+            ;;
+        "ninja")
+            # Ninja uses -j flag
+            echo "-j$cores"
+            ;;
+        "maven"|"mvn")
+            # Maven uses -T flag for parallel builds
+            echo "-T $cores"
+            ;;
+        "gradle")
+            # Gradle uses --parallel and --max-workers
+            echo "--parallel --max-workers=$cores"
+            ;;
+        *)
+            # Unknown build system - return empty or default
+            # Some build systems don't need explicit parallel flags
+            echo ""
+            ;;
+    esac
+
+    return 0
+}
+
+# Allocate CPU cores for build container
+# Usage: allocate_cpu_cores [requested_cores]
+# Returns: Number of cores to allocate in flat data format
+# Behavior: Allocates cores based on request and availability, handles single-core systems
+allocate_cpu_cores() {
+    local requested_cores="$1"
+    local available_cores
+    available_cores=$(get_available_cpu_cores)
+
+    # If no cores requested, use all available
+    if [[ -z "$requested_cores" ]] || [[ "$requested_cores" == "0" ]]; then
+        echo "allocated_cores=$available_cores"
+        echo "available_cores=$available_cores"
+        echo "allocation_strategy=all_available"
+        return 0
+    fi
+
+    # Validate requested cores is a positive integer
+    if ! [[ "$requested_cores" =~ ^[0-9]+$ ]]; then
+        echo "allocated_cores=1"
+        echo "available_cores=$available_cores"
+        echo "allocation_strategy=default"
+        echo "error_message=Invalid core count requested, using default"
+        return 0
+    fi
+
+    # Allocate requested cores, but not more than available
+    local allocated_cores
+    if [[ "$requested_cores" -gt "$available_cores" ]]; then
+        allocated_cores=$available_cores
+        echo "allocated_cores=$allocated_cores"
+        echo "available_cores=$available_cores"
+        echo "requested_cores=$requested_cores"
+        echo "allocation_strategy=limited_by_availability"
+        echo "warning_message=Requested $requested_cores cores but only $available_cores available"
+    else
+        allocated_cores=$requested_cores
+        echo "allocated_cores=$allocated_cores"
+        echo "available_cores=$available_cores"
+        echo "requested_cores=$requested_cores"
+        echo "allocation_strategy=requested"
+    fi
+
+    # Ensure at least 1 core is allocated
+    if [[ "$allocated_cores" -lt 1 ]]; then
+        allocated_cores=1
+        echo "allocated_cores=$allocated_cores"
+        echo "allocation_strategy=minimum"
+    fi
 
     return 0
 }

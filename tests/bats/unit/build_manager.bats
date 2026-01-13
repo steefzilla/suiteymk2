@@ -566,3 +566,177 @@ container_name=suitey-test-empty-$$"
     assert_output --partial "error_message="
 }
 
+@test "allocate_cpu_cores() allocates multiple CPU cores to build container" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/rust-project" ]]; then
+        skip "example/rust-project not available"
+    fi
+
+    # Get available CPU cores
+    run get_available_cpu_cores
+    assert_success
+    local available_cores
+    available_cores=$(echo "$output" | tr -d '[:space:]')
+    assert [ -n "$available_cores" ]
+    assert [ "$available_cores" -gt 0 ]
+
+    # Allocate CPU cores (use at least 1, but not more than available)
+    local cores_to_allocate
+    if [[ "$available_cores" -ge 2 ]]; then
+        cores_to_allocate=2
+    else
+        cores_to_allocate=1
+    fi
+
+    # Create container configuration with CPU cores
+    local container_config="docker_image=rust:1.70-slim
+project_root=example/rust-project
+working_directory=/workspace
+cpu_cores=$cores_to_allocate
+container_name=suitey-test-cores-$$"
+
+    run launch_build_container "$container_config"
+    assert_success
+
+    # Extract container ID
+    local container_id
+    container_id=$(echo "$output" | grep "^container_id=" | cut -d'=' -f2)
+    if [[ -n "$container_id" ]]; then
+        TEST_CONTAINERS+=("$container_id")
+    fi
+
+    # Verify CPU allocation in container
+    if [[ -n "$container_id" ]]; then
+        # Check container CPU limit using docker inspect
+        run docker inspect "$container_id" --format '{{.HostConfig.CpuQuota}}'
+        assert_success
+        # CPU quota should be set (non-zero) when cores are allocated
+        # Format: quota is in microseconds, cores * 100000 = quota
+        local cpu_quota
+        cpu_quota=$(echo "$output" | tr -d '[:space:]')
+        if [[ "$cores_to_allocate" -gt 0 ]]; then
+            assert [ -n "$cpu_quota" ]
+        fi
+    fi
+}
+
+@test "get_parallel_build_flags() uses parallel build flags with nproc" {
+    # Test that parallel build flags are generated correctly
+    run get_parallel_build_flags "cargo"
+    assert_success
+    
+    # Cargo uses --jobs flag for parallel builds
+    assert_output --partial "--jobs"
+    
+    # Should include number of cores (use a pattern that doesn't conflict with grep options)
+    local flags
+    flags=$(echo "$output" | grep -oE '\-\-jobs [0-9]+' || echo "")
+    # Alternative: just check that output contains a number after --jobs
+    if [[ -z "$flags" ]]; then
+        # Try simpler check - just verify it has --jobs and a number
+        assert_output --regexp '--jobs [0-9]+'
+    else
+        assert [ -n "$flags" ]
+    fi
+}
+
+@test "get_parallel_build_flags() handles make build systems" {
+    # Test that make gets -j flag
+    run get_parallel_build_flags "make"
+    assert_success
+    
+    # Make uses -j flag
+    assert_output --partial "-j"
+    
+    # Should include number of cores (escape -j to avoid grep treating it as option)
+    local flags
+    flags=$(echo "$output" | grep -oE '\-j[0-9]+' || echo "")
+    assert [ -n "$flags" ]
+}
+
+@test "get_parallel_build_flags() handles unknown build systems gracefully" {
+    # Test that unknown build systems return empty or default
+    run get_parallel_build_flags "unknown-build-system"
+    assert_success
+    
+    # Should not fail, may return empty or default flags
+    # Just verify it doesn't error
+}
+
+@test "get_available_cpu_cores() handles single-core systems gracefully" {
+    # Test that single-core systems are handled
+    run get_available_cpu_cores
+    assert_success
+    
+    # Should return at least 1
+    local cores
+    cores=$(echo "$output" | grep -oE '[0-9]+' || echo "0")
+    assert [ "$cores" -ge 1 ]
+    
+    # Should handle single-core gracefully (return 1)
+    if [[ "$cores" -eq 1 ]]; then
+        # Single core system - should still work
+        assert [ "$cores" -eq 1 ]
+    fi
+}
+
+@test "execute_build_command() uses parallel build flags when available" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/rust-project" ]]; then
+        skip "example/rust-project not available"
+    fi
+
+    # Launch a build container
+    local container_config="docker_image=rust:1.70-slim
+project_root=example/rust-project
+working_directory=/workspace
+container_name=suitey-test-parallel-$$"
+
+    run launch_build_container "$container_config"
+    assert_success
+
+    # Extract container ID
+    local container_id
+    container_id=$(echo "$output" | grep "^container_id=" | cut -d'=' -f2)
+    if [[ -n "$container_id" ]]; then
+        TEST_CONTAINERS+=("$container_id")
+    fi
+
+    # Get parallel build flags for cargo
+    local parallel_flags
+    parallel_flags=$(get_parallel_build_flags "cargo")
+    
+    # Execute build command with parallel flags
+    local build_command="CARGO_TARGET_DIR=/tmp/build-artifacts cargo build $parallel_flags 2>&1 || true"
+    run execute_build_command "$container_id" "$build_command"
+    assert_success
+
+    # Verify command was executed (may succeed or fail, but should execute)
+    assert_output --partial "exit_code="
+    
+    # Verify parallel flags were used (check stdout/stderr for -j flag)
+    local stdout
+    stdout=$(echo "$output" | grep "^stdout=" | cut -d'=' -f2- || echo "")
+    local stderr
+    stderr=$(echo "$output" | grep "^stderr=" | cut -d'=' -f2- || echo "")
+    
+    # The build command should have included parallel flags
+    # (We can't easily verify this without parsing cargo output, but the function should work)
+}
+

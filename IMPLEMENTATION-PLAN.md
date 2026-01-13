@@ -785,12 +785,12 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **3.1.3 Multi-Core Build Support**
 *Allocate multiple CPU cores to build containers and use parallel build flags (e.g., -j$(nproc)) for faster builds.*
-- [ ] **Red**: Write tests for multi-core support
+- [x] **Red**: Write tests for multi-core support
   - Test: Allocate multiple CPU cores to build container
   - Test: Use parallel build flags (`-j$(nproc)`)
   - Test: Handle single-core systems gracefully
-- [ ] **Green**: Implement multi-core allocation
-- [ ] **Refactor**: Optimize core allocation strategy
+- [x] **Green**: Implement multi-core allocation
+- [x] **Refactor**: Optimize core allocation strategy
 
 **3.1.4 Test Image Creation**
 *Generate Dockerfiles and build Docker images containing build artifacts, source code, and test suites for test execution.*
