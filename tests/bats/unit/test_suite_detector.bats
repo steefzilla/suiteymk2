@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
-load 'test_helper/bats-support/load'
-load 'test_helper/bats-assert/load'
+load '../test_helper/bats-support/load'
+load '../test_helper/bats-assert/load'
 
 # Source the mod_registry.sh and test_suite_detector.sh files for testing
 setup() {

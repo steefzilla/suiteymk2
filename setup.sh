@@ -82,10 +82,8 @@ verify_test_setup() {
 
     # Check if test helper libraries exist
     local helpers=(
-        "tests/bats/unit/test_helper/bats-support/load.bash"
-        "tests/bats/unit/test_helper/bats-assert/load.bash"
-        "tests/bats/integration/test_helper/bats-support/load.bash"
-        "tests/bats/integration/test_helper/bats-assert/load.bash"
+        "tests/bats/test_helper/bats-support/load.bash"
+        "tests/bats/test_helper/bats-assert/load.bash"
     )
 
     local missing_helpers=()

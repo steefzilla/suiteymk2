@@ -99,11 +99,11 @@ check_test_dependencies() {
     done
 
     # Check for bats-support and bats-assert libraries
-    if [[ ! -f "tests/bats/unit/test_helper/bats-support/load.bash" ]]; then
+    if [[ ! -f "tests/bats/test_helper/bats-support/load.bash" ]]; then
         missing_deps+=("bats-support")
     fi
 
-    if [[ ! -f "tests/bats/unit/test_helper/bats-assert/load.bash" ]]; then
+    if [[ ! -f "tests/bats/test_helper/bats-assert/load.bash" ]]; then
         missing_deps+=("bats-assert")
     fi
 

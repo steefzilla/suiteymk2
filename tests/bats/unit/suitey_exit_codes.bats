@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
-load 'test_helper/bats-support/load'
-load 'test_helper/bats-assert/load'
+load '../test_helper/bats-support/load'
+load '../test_helper/bats-assert/load'
 
 setup() {
     # Ensure we're in the project root
@@ -24,17 +24,7 @@ teardown() {
     fi
 }
 
-@test "./suitey.sh --help exits with code 0" {
-    run "$TEST_BUILD_DIR/suitey.sh" --help
-    assert_success
-    assert_equal "$status" 0
-}
-
-@test "./suitey.sh -h exits with code 0" {
-    run "$TEST_BUILD_DIR/suitey.sh" -h
-    assert_success
-    assert_equal "$status" 0
-}
+# Help exit code tests removed - covered by suitey_help.bats
 
 @test "./suitey.sh --version exits with code 0" {
     run "$TEST_BUILD_DIR/suitey.sh" --version
@@ -88,17 +78,4 @@ teardown() {
     assert_output --partial "Error"
 }
 
-@test "Help options consistently exit with code 0" {
-    run "$TEST_BUILD_DIR/suitey.sh" --help
-    local help_status="$status"
-    
-    run "$TEST_BUILD_DIR/suitey.sh" -h
-    local h_status="$status"
-    
-    run "$TEST_BUILD_DIR/suitey.sh"
-    local no_args_status="$status"
-    
-    assert_equal "$help_status" 0
-    assert_equal "$h_status" 0
-    assert_equal "$no_args_status" 0
-}
+# Help options exit code test removed - covered by suitey_help.bats

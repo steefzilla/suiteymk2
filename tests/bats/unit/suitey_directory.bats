@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
-load 'test_helper/bats-support/load'
-load 'test_helper/bats-assert/load'
+load '../test_helper/bats-support/load'
+load '../test_helper/bats-assert/load'
 
 setup() {
     # Ensure we're in the project root
@@ -23,12 +23,7 @@ teardown() {
     fi
 }
 
-@test "./suitey.sh (no args) shows help text" {
-    run "$TEST_BUILD_DIR/suitey.sh"
-    assert_success
-    assert_output --partial "Suitey"
-    assert_output --partial "Usage:"
-}
+# Help text test removed - covered by suitey_help.bats
 
 @test "./suitey.sh . accepts current directory as argument" {
     # Create a test directory and change to it
@@ -90,16 +85,11 @@ teardown() {
 }
 
 @test "./suitey.sh --help still shows help (options take precedence)" {
-    run "$TEST_BUILD_DIR/suitey.sh" --help
-    assert_success
-    assert_output --partial "Suitey"
-    assert_output --partial "Usage:"
-    
+    # Test that --help option takes precedence over directory arguments
     # Even with a directory argument after, help should take precedence
     run "$TEST_BUILD_DIR/suitey.sh" --help .
     assert_success
-    assert_output --partial "Suitey"
-    assert_output --partial "Usage:"
+    # Help text content is tested in suitey_help.bats, here we just verify precedence
 }
 
 @test "./suitey.sh --version still shows version (options take precedence)" {

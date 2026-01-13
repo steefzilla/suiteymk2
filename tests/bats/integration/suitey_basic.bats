@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
-load 'test_helper/bats-support/load'
-load 'test_helper/bats-assert/load'
+load '../test_helper/bats-support/load'
+load '../test_helper/bats-assert/load'
 
 setup() {
     # Ensure we're in the project root
@@ -23,37 +23,22 @@ teardown() {
     fi
 }
 
-@test "Integration: ./suitey.sh --help runs successfully (exit code 0)" {
+@test "Integration: Help functionality works end-to-end" {
+    # Comprehensive integration test for help - detailed tests are in suitey_help.bats
     run "$TEST_BUILD_DIR/suitey.sh" --help
-    assert_success
-    assert_equal "$status" 0
-    assert_output --partial "Suitey"
-    assert_output --partial "Usage:"
-}
-
-@test "Integration: ./suitey.sh -h runs successfully (exit code 0)" {
-    run "$TEST_BUILD_DIR/suitey.sh" -h
-    assert_success
-    assert_equal "$status" 0
-    assert_output --partial "Suitey"
-    assert_output --partial "Usage:"
-}
-
-@test "Integration: Script shows help text when run without arguments" {
-    run "$TEST_BUILD_DIR/suitey.sh"
     assert_success
     assert_equal "$status" 0
     assert_output --partial "Suitey"
     assert_output --partial "Usage:"
     
-    # Should be same as --help
-    run "$TEST_BUILD_DIR/suitey.sh" --help
-    local help_output="$output"
+    # Verify -h and no args produce same output
+    run "$TEST_BUILD_DIR/suitey.sh" -h
+    local h_output="$output"
     
     run "$TEST_BUILD_DIR/suitey.sh"
     local no_args_output="$output"
     
-    assert_equal "$help_output" "$no_args_output"
+    assert_equal "$h_output" "$no_args_output"
 }
 
 @test "Integration: Script validates environment before execution" {

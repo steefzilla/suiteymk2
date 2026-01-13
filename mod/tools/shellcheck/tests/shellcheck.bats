@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
-load '/home/steef/workspace/suiteymk2/tests/bats/unit/test_helper/bats-support/load'
-load '/home/steef/workspace/suiteymk2/tests/bats/unit/test_helper/bats-assert/load'
+load '../../../../tests/bats/test_helper/bats-support/load'
+load '../../../../tests/bats/test_helper/bats-assert/load'
 
 # Source the shellcheck module for testing
 setup() {
