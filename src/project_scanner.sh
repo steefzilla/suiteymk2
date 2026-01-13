@@ -10,6 +10,80 @@ source "src/test_suite_detector.sh" 2>/dev/null || true
 source "src/build_system_detector.sh" 2>/dev/null || true
 source "src/data_access.sh" 2>/dev/null || true
 
+# Aggregate results from all detection phases into unified data structure
+# Usage: aggregate_scan_results <platform_data> <suite_data> <build_data> <build_steps_data> <dependency_data>
+# Returns: Unified aggregated results in flat data format
+aggregate_scan_results() {
+    local platform_data="$1"
+    local suite_data="$2"
+    local build_data="$3"
+    local build_steps_data="$4"
+    local dependency_data="$5"
+
+    local result=""
+
+    # Set overall scan status
+    result=$(data_set "$result" "scan_result" "success")
+
+    # Aggregate platform detection results
+    result=$(data_set "$result" "platform_detection_status" "success")
+    # Parse and merge platform data
+    while IFS='=' read -r key value; do
+        if [[ -n "$key" ]]; then
+            result=$(data_set "$result" "$key" "$value")
+        fi
+    done <<< "$platform_data"
+
+    # Aggregate test suite detection results
+    result=$(data_set "$result" "test_suite_detection_status" "success")
+    # Parse and merge suite data
+    while IFS='=' read -r key value; do
+        if [[ -n "$key" ]]; then
+            result=$(data_set "$result" "$key" "$value")
+        fi
+    done <<< "$suite_data"
+
+    # Aggregate build system detection results
+    result=$(data_set "$result" "build_system_detection_status" "success")
+    # Parse and merge build data
+    while IFS='=' read -r key value; do
+        if [[ -n "$key" ]]; then
+            result=$(data_set "$result" "$key" "$value")
+        fi
+    done <<< "$build_data"
+
+    # Aggregate build steps detection results
+    result=$(data_set "$result" "build_steps_detection_status" "success")
+    # Parse and merge build steps data
+    while IFS='=' read -r key value; do
+        if [[ -n "$key" ]]; then
+            result=$(data_set "$result" "$key" "$value")
+        fi
+    done <<< "$build_steps_data"
+
+    # Aggregate build dependency analysis results
+    result=$(data_set "$result" "build_dependency_analysis_status" "success")
+    # Parse and merge dependency data
+    while IFS='=' read -r key value; do
+        if [[ -n "$key" ]]; then
+            result=$(data_set "$result" "$key" "$value")
+        fi
+    done <<< "$dependency_data"
+
+    # Add summary information
+    local platforms_count=$(echo "$platform_data" | grep "^platforms_count=" | cut -d'=' -f2 || echo "0")
+    local suites_count=$(echo "$suite_data" | grep "^suites_count=" | cut -d'=' -f2 || echo "0")
+    local requires_build=$(echo "$build_data" | grep "^requires_build=" | cut -d'=' -f2 || echo "false")
+    local build_steps_count=$(echo "$build_steps_data" | grep "^build_steps_count=" | cut -d'=' -f2 || echo "0")
+
+    result=$(data_set "$result" "summary_platforms_detected" "$platforms_count")
+    result=$(data_set "$result" "summary_test_suites_found" "$suites_count")
+    result=$(data_set "$result" "summary_build_required" "$requires_build")
+    result=$(data_set "$result" "summary_build_steps_defined" "$build_steps_count")
+
+    echo "$result"
+}
+
 # Scan project and detect all aspects
 # Usage: scan_project <project_root>
 # Returns: Unified project scan results in flat data format

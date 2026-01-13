@@ -170,3 +170,139 @@ teardown() {
         skip "example/rust-project not available"
     fi
 }
+
+@test "aggregate_scan_results() combines platform detection results from example projects" {
+    # Mock platform detection result
+    local platform_data="platforms_count=1
+platforms_0_language=rust
+platforms_0_framework=cargo
+platforms_0_confidence=high
+platforms_0_module_type=language"
+
+    local suite_data="suites_count=0"
+    local build_data="requires_build=false
+build_commands_count=0"
+    local build_steps_data="build_steps_count=0"
+    local dependency_data="execution_order_count=0"
+
+    run aggregate_scan_results "$platform_data" "$suite_data" "$build_data" "$build_steps_data" "$dependency_data"
+    assert_success
+
+    # Verify platform data is included
+    assert_output --partial "platforms_count=1"
+    assert_output --partial "platforms_0_language=rust"
+    assert_output --partial "platforms_0_framework=cargo"
+    assert_output --partial "platform_detection_status=success"
+}
+
+@test "aggregate_scan_results() combines test suite results from example projects" {
+    local platform_data="platforms_count=0"
+    # Mock test suite detection result
+    local suite_data="suites_count=2
+suites_0_name=unit
+suites_0_files_count=3
+suites_0_test_count=5
+suites_1_name=integration
+suites_1_files_count=2
+suites_1_test_count=8"
+
+    local build_data="requires_build=false
+build_commands_count=0"
+    local build_steps_data="build_steps_count=0"
+    local dependency_data="execution_order_count=0"
+
+    run aggregate_scan_results "$platform_data" "$suite_data" "$build_data" "$build_steps_data" "$dependency_data"
+    assert_success
+
+    # Verify test suite data is included
+    assert_output --partial "suites_count=2"
+    assert_output --partial "suites_0_name=unit"
+    assert_output --partial "suites_0_test_count=5"
+    assert_output --partial "suites_1_name=integration"
+    assert_output --partial "suites_1_test_count=8"
+    assert_output --partial "test_suite_detection_status=success"
+}
+
+@test "aggregate_scan_results() combines build requirement results from example projects" {
+    local platform_data="platforms_count=0"
+    local suite_data="suites_count=0"
+    # Mock build system detection result
+    local build_data="requires_build=true
+build_commands_count=1
+build_commands_0=\"cargo build --tests\"
+build_dependencies_count=0
+build_artifacts_count=0"
+
+    local build_steps_data="build_steps_count=0"
+    local dependency_data="execution_order_count=0"
+
+    run aggregate_scan_results "$platform_data" "$suite_data" "$build_data" "$build_steps_data" "$dependency_data"
+    assert_success
+
+    # Verify build data is included
+    assert_output --partial "requires_build=true"
+    assert_output --partial "build_commands_count=1"
+    assert_output --partial "build_commands_0="
+    assert_output --partial "cargo build --tests"
+    assert_output --partial "build_system_detection_status=success"
+}
+
+@test "aggregate_scan_results() handles partial failures (some detectors fail)" {
+    # Simulate partial failure - empty build data
+    local platform_data="platforms_count=1
+platforms_0_language=rust"
+    local suite_data="suites_count=0"
+    local build_data=""  # Simulate failure - no build data
+    local build_steps_data="build_steps_count=0"
+    local dependency_data="execution_order_count=0"
+
+    run aggregate_scan_results "$platform_data" "$suite_data" "$build_data" "$build_steps_data" "$dependency_data"
+    assert_success
+
+    # Should still aggregate available data
+    assert_output --partial "platforms_count=1"
+    assert_output --partial "platforms_0_language=rust"
+    assert_output --partial "suites_count=0"
+    # Build data should be empty but status should still be set
+    assert_output --partial "build_system_detection_status=success"
+}
+
+@test "aggregate_scan_results() provides summary information" {
+    local platform_data="platforms_count=2"
+    local suite_data="suites_count=3"
+    local build_data="requires_build=true"
+    local build_steps_data="build_steps_count=1"
+    local dependency_data="execution_order_count=1"
+
+    run aggregate_scan_results "$platform_data" "$suite_data" "$build_data" "$build_steps_data" "$dependency_data"
+    assert_success
+
+    # Verify summary fields
+    assert_output --partial "summary_platforms_detected=2"
+    assert_output --partial "summary_test_suites_found=3"
+    assert_output --partial "summary_build_required=true"
+    assert_output --partial "summary_build_steps_defined=1"
+}
+
+@test "aggregate_scan_results() returns structured results in flat data format" {
+    local platform_data="platforms_count=0"
+    local suite_data="suites_count=0"
+    local build_data="requires_build=false"
+    local build_steps_data="build_steps_count=0"
+    local dependency_data="execution_order_count=0"
+
+    run aggregate_scan_results "$platform_data" "$suite_data" "$build_data" "$build_steps_data" "$dependency_data"
+    assert_success
+
+    # Verify all expected fields are present
+    assert_output --regexp "scan_result="
+    assert_output --regexp "platform_detection_status="
+    assert_output --regexp "test_suite_detection_status="
+    assert_output --regexp "build_system_detection_status="
+    assert_output --regexp "build_steps_detection_status="
+    assert_output --regexp "build_dependency_analysis_status="
+    assert_output --regexp "summary_platforms_detected="
+    assert_output --regexp "summary_test_suites_found="
+    assert_output --regexp "summary_build_required="
+    assert_output --regexp "summary_build_steps_defined="
+}
