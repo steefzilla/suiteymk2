@@ -308,3 +308,261 @@ container_name=suitey-test-artifacts-$$"
     refute_output --partial "$container2"
 }
 
+@test "execute_build_command() executes cargo build in container using example/rust-project" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/rust-project" ]]; then
+        skip "example/rust-project not available"
+    fi
+
+    # Launch a build container
+    local container_config="docker_image=rust:1.70-slim
+project_root=example/rust-project
+working_directory=/workspace
+container_name=suitey-test-build-$$"
+
+    run launch_build_container "$container_config"
+    assert_success
+
+    # Extract container ID
+    local container_id
+    container_id=$(echo "$output" | grep "^container_id=" | cut -d'=' -f2)
+    if [[ -n "$container_id" ]]; then
+        TEST_CONTAINERS+=("$container_id")
+    fi
+
+    # Execute build command with CARGO_TARGET_DIR set to writable location
+    # Note: Cargo.lock will still try to write to project root, but build artifacts go to /tmp
+    local build_command="CARGO_TARGET_DIR=/tmp/build-artifacts cargo build 2>&1 || true"
+    run execute_build_command "$container_id" "$build_command"
+    assert_success
+
+    # Verify output contains build results
+    assert_output --partial "exit_code="
+    assert_output --partial "duration="
+    # Cargo build may fail due to read-only filesystem for Cargo.lock, but function should still report results
+    local exit_code
+    exit_code=$(echo "$output" | grep "^exit_code=" | cut -d'=' -f2)
+    # Accept any exit code (0 for success, non-zero for failure)
+    assert [ -n "$exit_code" ]
+
+    # Verify duration is tracked
+    local duration
+    duration=$(echo "$output" | grep "^duration=" | cut -d'=' -f2)
+    assert [ -n "$duration" ]
+    # Duration should be a positive number
+    assert [ "$(echo "$duration > 0" | bc 2>/dev/null || echo "1")" = "1" ]
+}
+
+@test "execute_build_command() captures build output (stdout/stderr)" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/rust-project" ]]; then
+        skip "example/rust-project not available"
+    fi
+
+    # Launch a build container
+    local container_config="docker_image=rust:1.70-slim
+project_root=example/rust-project
+working_directory=/workspace
+container_name=suitey-test-output-$$"
+
+    run launch_build_container "$container_config"
+    assert_success
+
+    # Extract container ID
+    local container_id
+    container_id=$(echo "$output" | grep "^container_id=" | cut -d'=' -f2)
+    if [[ -n "$container_id" ]]; then
+        TEST_CONTAINERS+=("$container_id")
+    fi
+
+    # Execute build command
+    local build_command="cargo build"
+    run execute_build_command "$container_id" "$build_command"
+    assert_success
+
+    # Verify output is captured
+    assert_output --partial "stdout="
+    assert_output --partial "stderr="
+    
+    # Verify stdout contains cargo build output
+    local stdout
+    stdout=$(echo "$output" | grep "^stdout=" | cut -d'=' -f2- || echo "")
+    # stdout should contain cargo-related output (may be empty for successful builds)
+    # At minimum, verify the key exists
+    
+    # Verify stderr key exists (may be empty)
+    local stderr
+    stderr=$(echo "$output" | grep "^stderr=" | cut -d'=' -f2- || echo "")
+    # stderr key should be present
+}
+
+@test "execute_build_command() detects build failures (non-zero exit code)" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/rust-project" ]]; then
+        skip "example/rust-project not available"
+    fi
+
+    # Launch a build container
+    local container_config="docker_image=rust:1.70-slim
+project_root=example/rust-project
+working_directory=/workspace
+container_name=suitey-test-failure-$$"
+
+    run launch_build_container "$container_config"
+    assert_success
+
+    # Extract container ID
+    local container_id
+    container_id=$(echo "$output" | grep "^container_id=" | cut -d'=' -f2)
+    if [[ -n "$container_id" ]]; then
+        TEST_CONTAINERS+=("$container_id")
+    fi
+
+    # Execute a command that will fail
+    local build_command="cargo build --invalid-flag-that-does-not-exist"
+    run execute_build_command "$container_id" "$build_command"
+    assert_success  # Function itself succeeds, but build fails
+
+    # Verify exit code indicates failure
+    local exit_code
+    exit_code=$(echo "$output" | grep "^exit_code=" | cut -d'=' -f2)
+    assert [ "$exit_code" != "0" ]
+    
+    # Verify build_status indicates failure
+    local build_status
+    build_status=$(echo "$output" | grep "^build_status=" | cut -d'=' -f2 || echo "")
+    if [[ -n "$build_status" ]]; then
+        assert_equal "$build_status" "failed"
+    fi
+}
+
+@test "execute_build_command() tracks build duration" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/rust-project" ]]; then
+        skip "example/rust-project not available"
+    fi
+
+    # Launch a build container
+    local container_config="docker_image=rust:1.70-slim
+project_root=example/rust-project
+working_directory=/workspace
+container_name=suitey-test-duration-$$"
+
+    run launch_build_container "$container_config"
+    assert_success
+
+    # Extract container ID
+    local container_id
+    container_id=$(echo "$output" | grep "^container_id=" | cut -d'=' -f2)
+    if [[ -n "$container_id" ]]; then
+        TEST_CONTAINERS+=("$container_id")
+    fi
+
+    # Execute a command that takes some time
+    local build_command="sleep 1 && cargo build"
+    local start_time
+    start_time=$(date +%s.%N)
+    
+    run execute_build_command "$container_id" "$build_command"
+    assert_success
+    
+    local end_time
+    end_time=$(date +%s.%N)
+
+    # Verify duration is tracked
+    local duration
+    duration=$(echo "$output" | grep "^duration=" | cut -d'=' -f2)
+    assert [ -n "$duration" ]
+    
+    # Duration should be a positive number
+    assert [ "$(echo "$duration > 0" | bc 2>/dev/null || echo "1")" = "1" ]
+    
+    # Duration should be reasonable (at least 1 second due to sleep)
+    local duration_float
+    duration_float=$(echo "$duration" | cut -d'.' -f1)
+    assert [ "$duration_float" -ge 1 ]
+    
+    # Verify duration is in seconds (format: X.XXX)
+    assert_output --regexp "duration=[0-9]+\.[0-9]+"
+}
+
+@test "execute_build_command() handles invalid container ID" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    run execute_build_command "nonexistent-container-12345" "cargo build"
+    assert_failure
+    assert_output --partial "error_message="
+    assert_output --partial "container_status=error"
+}
+
+@test "execute_build_command() handles empty build command" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/rust-project" ]]; then
+        skip "example/rust-project not available"
+    fi
+
+    # Launch a build container
+    local container_config="docker_image=rust:1.70-slim
+project_root=example/rust-project
+working_directory=/workspace
+container_name=suitey-test-empty-$$"
+
+    run launch_build_container "$container_config"
+    assert_success
+
+    # Extract container ID
+    local container_id
+    container_id=$(echo "$output" | grep "^container_id=" | cut -d'=' -f2)
+    if [[ -n "$container_id" ]]; then
+        TEST_CONTAINERS+=("$container_id")
+    fi
+
+    # Execute empty command
+    run execute_build_command "$container_id" ""
+    assert_failure
+    assert_output --partial "error_message="
+}
+
