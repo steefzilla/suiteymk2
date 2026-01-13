@@ -765,13 +765,13 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **3.1.1 Docker Container Management**
 *Implement container lifecycle management: launch build containers with correct mounts, track containers, and clean up on completion.*
-- [ ] **Red**: Write test `tests/bats/unit/build_manager.bats` (with Docker mocking)
+- [x] **Red**: Write test `tests/bats/unit/build_manager.bats` (with Docker mocking)
   - Test: Launch build container with correct configuration using `./example/rust-project/`
   - Test: Mount project directory read-only using example projects
   - Test: Mount `/tmp` artifact directory read-write
   - Test: Clean up containers on completion
-- [ ] **Green**: Implement container management in `src/build_manager.sh`
-- [ ] **Refactor**: Improve container lifecycle management
+- [x] **Green**: Implement container management in `src/build_manager.sh`
+- [x] **Refactor**: Improve container lifecycle management
 
 **3.1.2 Build Execution**
 *Execute build commands in Docker containers, capture output and exit codes, and track build duration.*
