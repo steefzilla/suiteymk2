@@ -3,6 +3,10 @@
 # Build System Detector
 # Determines if and how projects need to be built before testing
 # Aggregates build requirements from all detected platforms
+#
+# Filesystem Isolation: This module only reads from project directories.
+# Build execution happens in isolated Docker containers with read-only
+# project access. No modifications are made to the project filesystem.
 
 # Source required dependencies
 source "src/data_access.sh" 2>/dev/null || true
@@ -146,6 +150,9 @@ detect_build_requirements() {
 # Get detailed build steps for detected platforms
 # Usage: get_build_steps <platform_data> <build_requirements>
 # Returns: Detailed build steps in flat data format
+# Behavior: Returns containerized build specifications. Build execution
+#           happens in isolated Docker containers with read-only project
+#           access. Project directories are never modified.
 get_build_steps() {
     local platform_data="$1"
     local build_requirements="$2"
@@ -245,6 +252,63 @@ get_build_steps() {
 
     # Set final results
     result=$(data_set "$result" "build_steps_count" "$total_build_steps_count")
+
+    echo "$result"
+    return 0
+}
+
+# Analyze dependencies between build steps
+# Usage: analyze_build_dependencies <build_steps>
+# Returns: Dependency analysis in flat data format
+# Behavior: Analyzes build step dependencies and determines execution order
+analyze_build_dependencies() {
+    local build_steps="$1"
+
+    # Initialize result data
+    local result=""
+    local execution_order=""
+    local parallel_groups_count=0
+    local dependency_graph=""
+
+    # Parse build steps count
+    local build_steps_count
+    build_steps_count=$(echo "$build_steps" | grep "^build_steps_count=" | cut -d'=' -f2 || echo "0")
+
+    if [[ -z "$build_steps_count" ]] || [[ "$build_steps_count" -eq 0 ]]; then
+        # No build steps, no dependencies to analyze
+        result="execution_order_count=0"$'\n'
+        result="${result}parallel_groups_count=0"$'\n'
+        result="${result}dependency_graph_count=0"
+        echo "$result"
+        return 0
+    fi
+
+    # For now, implement a simple dependency analysis
+    # In a real implementation, this would analyze actual dependencies between build steps
+    # For this phase, we'll assume all build steps can run in parallel (no dependencies)
+
+    # Create execution order (simple sequential for now)
+    local execution_order_list=""
+    local i=0
+    while [[ $i -lt "$build_steps_count" ]]; do
+        if [[ -n "$execution_order_list" ]]; then
+            execution_order_list="${execution_order_list},"
+        fi
+        execution_order_list="${execution_order_list}${i}"
+        ((i++))
+    done
+
+    result="execution_order_count=${build_steps_count}"$'\n'
+    result="${result}execution_order_steps=${execution_order_list}"$'\n'
+
+    # For now, assume all builds can run in parallel (no dependencies)
+    # In a real implementation, this would analyze dependencies and create groups
+    result="${result}parallel_groups_count=1"$'\n'
+    result="${result}parallel_groups_0_step_count=${build_steps_count}"$'\n'
+    result="${result}parallel_groups_0_steps=${execution_order_list}"$'\n'
+
+    # Simple dependency graph (no dependencies for now)
+    result="${result}dependency_graph_count=0"
 
     echo "$result"
     return 0

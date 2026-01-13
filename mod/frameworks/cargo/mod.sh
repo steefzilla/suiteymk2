@@ -184,12 +184,16 @@ get_build_steps() {
     fi
 
     # Cargo build step (similar to Rust language module but framework-specific)
+    # Note: Build execution happens in isolated Docker containers.
+    # Project directory is mounted read-only (when volume mounts are configured).
+    # Build artifacts are stored in container volumes, not in project directory.
     echo "build_steps_count=1"
     echo "build_steps_0_step_name=cargo_build"
     echo "build_steps_0_docker_image=rust:1.70-slim"
     echo "build_steps_0_build_command=cargo build --tests"
     echo "build_steps_0_working_directory=/workspace"
-    echo "build_steps_0_volume_mounts_count=0"
+    echo "build_steps_0_volume_mounts_count=0"  # No volume mounts needed (project copied into container)
+    echo "build_steps_0_volume_mounts_readonly=true"  # When mounts are used, they are read-only
     echo "build_steps_0_environment_variables_count=0"
     echo "build_steps_0_cpu_cores=0"  # Use all available cores
 

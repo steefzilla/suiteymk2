@@ -186,6 +186,7 @@ project_root=example/rust-project"
         assert_output --partial "build_steps_0_docker_image=rust:1.70-slim"
         assert_output --partial "build_steps_0_build_command=cargo build --tests"
         assert_output --partial "build_steps_0_working_directory=/workspace"
+        assert_output --partial "build_steps_0_volume_mounts_readonly=true"
     else
         skip "Rust module not available"
     fi
@@ -213,6 +214,7 @@ project_root=example/rust-project"
         assert_output --partial "build_steps_0_step_name=cargo_build"
         assert_output --partial "build_steps_0_docker_image=rust:1.70-slim"
         assert_output --partial "build_steps_0_build_command=cargo build --tests"
+        assert_output --partial "build_steps_0_volume_mounts_readonly=true"
     else
         skip "Cargo module not available"
     fi
@@ -260,4 +262,161 @@ project_root=example/bats-project"
 
     # Verify expected field is present
     assert_output --regexp "build_steps_count="
+}
+
+@test "analyze_build_dependencies() returns empty analysis when no build steps" {
+    local build_steps="build_steps_count=0"
+
+    run analyze_build_dependencies "$build_steps"
+    assert_success
+    assert_output --partial "execution_order_count=0"
+    assert_output --partial "parallel_groups_count=0"
+    assert_output --partial "dependency_graph_count=0"
+}
+
+@test "analyze_build_dependencies() analyzes single build step" {
+    local build_steps="build_steps_count=1
+build_steps_0_step_name=rust_build
+build_steps_0_docker_image=rust:1.70-slim
+build_steps_0_build_command=cargo build --tests"
+
+    run analyze_build_dependencies "$build_steps"
+    assert_success
+    assert_output --partial "execution_order_count=1"
+    assert_output --partial "execution_order_steps=0"
+    assert_output --partial "parallel_groups_count=1"
+    assert_output --partial "parallel_groups_0_step_count=1"
+    assert_output --partial "parallel_groups_0_steps=0"
+}
+
+@test "analyze_build_dependencies() analyzes multiple build steps" {
+    local build_steps="build_steps_count=2
+build_steps_0_step_name=rust_build
+build_steps_0_docker_image=rust:1.70-slim
+build_steps_0_build_command=cargo build --tests
+build_steps_1_step_name=cargo_build
+build_steps_1_docker_image=rust:1.70-slim
+build_steps_1_build_command=cargo build --tests"
+
+    run analyze_build_dependencies "$build_steps"
+    assert_success
+    assert_output --partial "execution_order_count=2"
+    assert_output --partial "execution_order_steps=0,1"
+    assert_output --partial "parallel_groups_count=1"
+    assert_output --partial "parallel_groups_0_step_count=2"
+    assert_output --partial "parallel_groups_0_steps=0,1"
+}
+
+@test "analyze_build_dependencies() handles invalid build steps data gracefully" {
+    local build_steps="invalid_data"
+
+    run analyze_build_dependencies "$build_steps"
+    assert_success
+    assert_output --partial "execution_order_count=0"
+}
+
+@test "analyze_build_dependencies() returns structured results in flat data format" {
+    local build_steps="build_steps_count=1
+build_steps_0_step_name=test_build"
+
+    run analyze_build_dependencies "$build_steps"
+    assert_success
+
+    # Verify all expected fields are present
+    assert_output --regexp "execution_order_count="
+    assert_output --regexp "parallel_groups_count="
+    assert_output --regexp "dependency_graph_count="
+}
+
+@test "detect_build_requirements() respects filesystem isolation (read-only project access)" {
+    # Create a temporary project directory
+    local test_project_dir
+    test_project_dir="$(mktemp -d)"
+    
+    # Create a test file in the project
+    echo "test content" > "$test_project_dir/test_file.txt"
+    
+    # Make project directory read-only to test filesystem isolation
+    chmod -w "$test_project_dir"
+    
+    # Register Rust module
+    if [[ -f "mod/languages/rust/mod.sh" ]]; then
+        source "mod/languages/rust/mod.sh" 2>/dev/null
+        register_module "rust-module" "rust-module" 2>/dev/null
+
+        # Mock platform detection result for Rust
+        local platform_data="platforms_count=1
+platforms_0_language=rust
+platforms_0_framework=cargo
+platforms_0_confidence=high
+platforms_0_module_type=language
+project_root=$test_project_dir"
+
+        # Run build requirements detection (should succeed even with read-only directory)
+        run detect_build_requirements "$platform_data"
+        assert_success
+        
+        # Verify it doesn't try to write to project directory
+        # The function should only read metadata, not write files
+        assert_output --partial "requires_build=true"
+        
+        # Verify test file was not modified
+        assert [ -f "$test_project_dir/test_file.txt" ]
+        assert_equal "$(cat "$test_project_dir/test_file.txt")" "test content"
+        
+        # Restore write permissions for cleanup
+        chmod +w "$test_project_dir"
+    else
+        skip "Rust module not available"
+    fi
+    
+    # Clean up
+    rm -rf "$test_project_dir"
+}
+
+@test "get_build_steps() respects filesystem isolation (read-only project access)" {
+    # Create a temporary project directory
+    local test_project_dir
+    test_project_dir="$(mktemp -d)"
+    
+    # Create a test file in the project
+    echo "test content" > "$test_project_dir/test_file.txt"
+    
+    # Make project directory read-only to test filesystem isolation
+    chmod -w "$test_project_dir"
+    
+    # Register Rust module
+    if [[ -f "mod/languages/rust/mod.sh" ]]; then
+        source "mod/languages/rust/mod.sh" 2>/dev/null
+        register_module "rust-module" "rust-module" 2>/dev/null
+
+        # Mock platform detection result for Rust
+        local platform_data="platforms_count=1
+platforms_0_language=rust
+platforms_0_framework=cargo
+platforms_0_confidence=high
+platforms_0_module_type=language
+project_root=$test_project_dir"
+
+        local build_requirements="requires_build=true"
+
+        # Run build steps detection (should succeed even with read-only directory)
+        run get_build_steps "$platform_data" "$build_requirements"
+        assert_success
+        
+        # Verify it doesn't try to write to project directory
+        assert_output --partial "build_steps_count=1"
+        
+        # Verify test file was not modified
+        assert [ -f "$test_project_dir/test_file.txt" ]
+        assert_equal "$(cat "$test_project_dir/test_file.txt")" "test content"
+        
+        # Restore write permissions for cleanup
+        chmod +w "$test_project_dir"
+    else
+        skip "Rust module not available"
+    fi
+    
+    # Clean up
+    rm -rf "$test_project_dir"
 }
