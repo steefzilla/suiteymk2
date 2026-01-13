@@ -6,6 +6,7 @@
 # Source required dependencies
 source "src/data_access.sh" 2>/dev/null || true
 source "src/suite_grouping.sh" 2>/dev/null || true
+source "src/test_counter.sh" 2>/dev/null || true
 
 # Discover test suites for detected platforms
 # Directly loads and calls module discover_test_suites methods based on platform type
@@ -93,6 +94,29 @@ discover_test_suites() {
                             result=$(data_set "$result" "${new_line%%=*}" "${new_line#*=}")
                         fi
                     done <<< "$suite_lines"
+
+                    # Count tests for this suite
+                    local suite_test_count=0
+                    local files_count
+                    files_count=$(data_get "$result" "suites_${suite_index}_files_count" || echo "0")
+                    
+                    if [[ -n "$files_count" ]] && [[ "$files_count" -gt 0 ]]; then
+                        local k=0
+                        while [[ $k -lt "$files_count" ]]; do
+                            local test_file
+                            test_file=$(data_get "$result" "suites_${suite_index}_files_${k}" || echo "")
+                            
+                            if [[ -n "$test_file" ]] && [[ -f "$test_file" ]]; then
+                                local file_test_count
+                                file_test_count=$(count_tests_in_file "$test_file" || echo "0")
+                                suite_test_count=$((suite_test_count + file_test_count))
+                            fi
+                            ((k++))
+                        done
+                    fi
+                    
+                    # Add test count to suite data
+                    result=$(data_set "$result" "suites_${suite_index}_test_count" "$suite_test_count")
 
                     ((suite_index++))
                     ((j++))

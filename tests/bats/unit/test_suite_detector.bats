@@ -25,6 +25,11 @@ setup() {
         source "src/suite_grouping.sh"
     fi
 
+    # Source the test_counter.sh file if it exists
+    if [[ -f "src/test_counter.sh" ]]; then
+        source "src/test_counter.sh"
+    fi
+
     # Reset registry before each test
     reset_registry
 }
@@ -369,4 +374,114 @@ EOF
     assert_output --partial "suites_0_name=unit"
     
     rm -rf "$test_project_dir"
+}
+
+# Test Counting Tests
+
+@test "count_bats_tests() counts @test annotations in BATS files" {
+    if [[ -f "example/bats-project/tests/bats/basic_tests.bats" ]]; then
+        run count_bats_tests "example/bats-project/tests/bats/basic_tests.bats"
+        assert_success
+        assert_output "4"
+    else
+        skip "Example BATS file not available"
+    fi
+}
+
+@test "count_bats_tests() returns 0 for files with no tests" {
+    local test_file
+    test_file="$(mktemp)"
+    
+    echo "#!/usr/bin/env bats" > "$test_file"
+    echo "# No tests here" >> "$test_file"
+    
+    run count_bats_tests "$test_file"
+    assert_success
+    assert_output "0"
+    
+    rm -f "$test_file"
+}
+
+@test "count_rust_tests() counts #[test] functions in Rust unit test files" {
+    if [[ -f "example/rust-project/src/lib.rs" ]]; then
+        run count_rust_tests "example/rust-project/src/lib.rs"
+        assert_success
+        assert_output "3"
+    else
+        skip "Example Rust file not available"
+    fi
+}
+
+@test "count_rust_tests() counts #[test] functions in Rust integration test files" {
+    if [[ -f "example/rust-project/tests/integration_test.rs" ]]; then
+        run count_rust_tests "example/rust-project/tests/integration_test.rs"
+        assert_success
+        assert_output "2"
+    else
+        skip "Example Rust integration test file not available"
+    fi
+}
+
+@test "count_rust_tests() returns 0 for files with no tests" {
+    local test_file
+    test_file="$(mktemp --suffix=.rs)"
+    
+    echo "pub fn add(a: i32, b: i32) -> i32 {" > "$test_file"
+    echo "    a + b" >> "$test_file"
+    echo "}" >> "$test_file"
+    
+    run count_rust_tests "$test_file"
+    assert_success
+    assert_output "0"
+    
+    rm -f "$test_file"
+}
+
+@test "count_tests_in_file() detects BATS files and counts tests" {
+    if [[ -f "example/bats-project/tests/bats/basic_tests.bats" ]]; then
+        run count_tests_in_file "example/bats-project/tests/bats/basic_tests.bats"
+        assert_success
+        assert_output "4"
+    else
+        skip "Example BATS file not available"
+    fi
+}
+
+@test "count_tests_in_file() detects Rust files and counts tests" {
+    if [[ -f "example/rust-project/src/lib.rs" ]]; then
+        run count_tests_in_file "example/rust-project/src/lib.rs"
+        assert_success
+        assert_output "3"
+    else
+        skip "Example Rust file not available"
+    fi
+}
+
+@test "count_tests_in_file() returns 0 for unknown file types" {
+    local test_file
+    test_file="$(mktemp --suffix=.unknown)"
+    
+    echo "some content" > "$test_file"
+    
+    run count_tests_in_file "$test_file"
+    assert_success
+    assert_output "0"
+    
+    rm -f "$test_file"
+}
+
+@test "count_tests_in_files() counts tests across multiple files" {
+    if [[ -f "example/bats-project/tests/bats/basic_tests.bats" ]] && [[ -f "example/bats-project/tests/bats/advanced_tests.bats" ]]; then
+        local basic_count
+        basic_count=$(count_bats_tests "example/bats-project/tests/bats/basic_tests.bats")
+        local advanced_count
+        advanced_count=$(count_bats_tests "example/bats-project/tests/bats/advanced_tests.bats")
+        local expected_total=$((basic_count + advanced_count))
+        
+        run count_tests_in_files "example/bats-project/tests/bats/basic_tests.bats" "example/bats-project/tests/bats/advanced_tests.bats"
+        assert_success
+        assert_output "$expected_total"
+    else
+        skip "Example BATS files not available"
+    fi
 }

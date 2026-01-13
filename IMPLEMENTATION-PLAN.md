@@ -632,12 +632,12 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **2.2.3 Test Counting**
 *Count individual tests in test files (e.g., @test annotations in BATS, #[test] functions in Rust) using module parsing.*
-- [ ] **Red**: Write tests for test counting
+- [x] **Red**: Write tests for test counting
   - Test: Count `@test` annotations in `./example/bats-project/tests/bats/` files
   - Test: Count `#[test]` functions in `./example/rust-project/src/lib.rs` and `./example/rust-project/tests/`
   - Test: Handle files with no tests
-- [ ] **Green**: Implement test counting using module's parsing logic
-- [ ] **Refactor**: Optimize counting, handle edge cases
+- [x] **Green**: Implement test counting using module's parsing logic
+- [x] **Refactor**: Optimize counting, handle edge cases
 
 **2.2.4 Integration with Platform Detector**
 *Integrate Test Suite Detector with Platform Detector to only discover tests for detected platforms.*
