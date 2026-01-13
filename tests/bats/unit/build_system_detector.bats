@@ -137,3 +137,127 @@ project_root=example/rust-project"
     assert_output --regexp "build_dependencies_count="
     assert_output --regexp "build_artifacts_count="
 }
+
+@test "get_build_steps() returns empty steps when no platforms detected" {
+    local platform_data="platforms_count=0"
+    local build_requirements="requires_build=false"
+
+    run get_build_steps "$platform_data" "$build_requirements"
+    assert_success
+    assert_output --partial "build_steps_count=0"
+}
+
+@test "get_build_steps() returns empty steps when building not required" {
+    # Mock platform detection result for Rust
+    local platform_data="platforms_count=1
+platforms_0_language=rust
+platforms_0_framework=cargo
+platforms_0_confidence=high
+platforms_0_module_type=language
+project_root=example/rust-project"
+
+    local build_requirements="requires_build=false"
+
+    run get_build_steps "$platform_data" "$build_requirements"
+    assert_success
+    assert_output --partial "build_steps_count=0"
+}
+
+@test "get_build_steps() identifies cargo build steps for Rust projects" {
+    # Register Rust module
+    if [[ -f "mod/languages/rust/mod.sh" ]]; then
+        source "mod/languages/rust/mod.sh" 2>/dev/null
+        register_module "rust-module" "rust-module" 2>/dev/null
+
+        # Mock platform detection result for Rust
+        local platform_data="platforms_count=1
+platforms_0_language=rust
+platforms_0_framework=cargo
+platforms_0_confidence=high
+platforms_0_module_type=language
+project_root=example/rust-project"
+
+        local build_requirements="requires_build=true"
+
+        run get_build_steps "$platform_data" "$build_requirements"
+        assert_success
+        assert_output --partial "build_steps_count=1"
+        assert_output --partial "build_steps_0_step_name=rust_build"
+        assert_output --partial "build_steps_0_docker_image=rust:1.70-slim"
+        assert_output --partial "build_steps_0_build_command=cargo build --tests"
+        assert_output --partial "build_steps_0_working_directory=/workspace"
+    else
+        skip "Rust module not available"
+    fi
+}
+
+@test "get_build_steps() identifies cargo build steps for Cargo framework projects" {
+    # Register Cargo module
+    if [[ -f "mod/frameworks/cargo/mod.sh" ]]; then
+        source "mod/frameworks/cargo/mod.sh" 2>/dev/null
+        register_module "cargo-module" "cargo-module" 2>/dev/null
+
+        # Mock platform detection result for Cargo
+        local platform_data="platforms_count=1
+platforms_0_language=rust
+platforms_0_framework=cargo
+platforms_0_confidence=high
+platforms_0_module_type=framework
+project_root=example/rust-project"
+
+        local build_requirements="requires_build=true"
+
+        run get_build_steps "$platform_data" "$build_requirements"
+        assert_success
+        assert_output --partial "build_steps_count=1"
+        assert_output --partial "build_steps_0_step_name=cargo_build"
+        assert_output --partial "build_steps_0_docker_image=rust:1.70-slim"
+        assert_output --partial "build_steps_0_build_command=cargo build --tests"
+    else
+        skip "Cargo module not available"
+    fi
+}
+
+@test "get_build_steps() returns empty steps for BATS projects" {
+    # Register BATS module
+    if [[ -f "mod/frameworks/bats/mod.sh" ]]; then
+        source "mod/frameworks/bats/mod.sh" 2>/dev/null
+        register_module "bats-module" "bats-module" 2>/dev/null
+
+        # Mock platform detection result for BATS
+        local platform_data="platforms_count=1
+platforms_0_language=bash
+platforms_0_framework=bats
+platforms_0_confidence=high
+platforms_0_module_type=framework
+project_root=example/bats-project"
+
+        local build_requirements="requires_build=false"
+
+        run get_build_steps "$platform_data" "$build_requirements"
+        assert_success
+        assert_output --partial "build_steps_count=0"
+    else
+        skip "BATS module not available"
+    fi
+}
+
+@test "get_build_steps() handles invalid platform data gracefully" {
+    local platform_data="invalid_data"
+    local build_requirements="requires_build=false"
+
+    run get_build_steps "$platform_data" "$build_requirements"
+    assert_success
+    assert_output --partial "build_steps_count=0"
+}
+
+@test "get_build_steps() returns structured results in flat data format" {
+    local platform_data="platforms_count=0"
+    local build_requirements="requires_build=false"
+
+    run get_build_steps "$platform_data" "$build_requirements"
+    assert_success
+
+    # Verify expected field is present
+    assert_output --regexp "build_steps_count="
+}

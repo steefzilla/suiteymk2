@@ -174,8 +174,25 @@ get_build_steps() {
     local project_root="$1"
     local build_requirements="$2"
 
-    # Stub implementation (will be expanded in later phases)
-    echo "build_steps_count=0"
+    # Check if building is required
+    local requires_build
+    requires_build=$(echo "$build_requirements" | grep "^requires_build=" | cut -d'=' -f2 || echo "false")
+
+    if [[ "$requires_build" != "true" ]]; then
+        echo "build_steps_count=0"
+        return 0
+    fi
+
+    # Cargo build step (similar to Rust language module but framework-specific)
+    echo "build_steps_count=1"
+    echo "build_steps_0_step_name=cargo_build"
+    echo "build_steps_0_docker_image=rust:1.70-slim"
+    echo "build_steps_0_build_command=cargo build --tests"
+    echo "build_steps_0_working_directory=/workspace"
+    echo "build_steps_0_volume_mounts_count=0"
+    echo "build_steps_0_environment_variables_count=0"
+    echo "build_steps_0_cpu_cores=0"  # Use all available cores
+
     return 0
 }
 
