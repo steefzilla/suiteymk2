@@ -664,15 +664,15 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **2.3.1 Build Requirement Detection**
 *Implement detect_build_requirements() to determine if projects need building before testing using module detection.*
-- [ ] **Red**: Write test `tests/bats/unit/build_system_detector.bats` for build detection
+- [x] **Red**: Write test `tests/bats/unit/build_system_detector.bats` for build detection
   - Test: Detect Rust requires build using `./example/rust-project/` (`Cargo.toml` present)
   - Test: Detect BATS does not require build using `./example/bats-project/`
   - Test: Detect Make-based builds (`Makefile` present)
   - Test: Return `requires_build=false` when no build needed
-- [ ] **Green**: Implement `detect_build_requirements()` in `src/build_system_detector.sh`
+- [x] **Green**: Implement `detect_build_requirements()` in `src/build_system_detector.sh`
   - Use Modules Registry to get modules
   - Call each module's `detect_build_requirements()` method
-- [ ] **Refactor**: Improve detection logic
+- [x] **Refactor**: Improve detection logic
 
 **2.3.2 Build Step Identification**
 *Identify build commands (e.g., cargo build, make targets) required for each platform using module get_build_steps().*
