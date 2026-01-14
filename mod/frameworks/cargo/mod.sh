@@ -226,22 +226,106 @@ parse_test_results() {
     local output="$1"
     local exit_code="$2"
 
-    # Stub implementation (will be expanded in later phases)
-    # For now, return basic structure based on exit code
-    if [[ "$exit_code" == "0" ]]; then
-        echo "total_tests=0"
-        echo "passed_tests=0"
-        echo "failed_tests=0"
-        echo "skipped_tests=0"
-        echo "test_details_count=0"
-        echo "status=passed"
-    else
-        echo "total_tests=0"
-        echo "passed_tests=0"
-        echo "failed_tests=0"
-        echo "skipped_tests=0"
-        echo "test_details_count=0"
-        echo "status=failed"
+    # Initialize counters
+    local total_tests=0
+    local passed_tests=0
+    local failed_tests=0
+    local skipped_tests=0
+    local test_details_count=0
+    local test_details=""
+
+    # Parse test summary line (e.g., "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out")
+    # Look for the summary line
+    local summary_line
+    summary_line=$(echo "$output" | grep -E "test result:" | head -1)
+
+    if [[ -n "$summary_line" ]]; then
+        # Extract numbers from summary line
+        # Format: "test result: ok/FAILED. X passed; Y failed; Z ignored; W measured; V filtered out"
+
+        # Extract passed count
+        local passed_count
+        passed_count=$(echo "$summary_line" | sed -n 's/.* \([0-9]\+\) passed.*/\1/p')
+        passed_tests=${passed_count:-0}
+
+        # Extract failed count
+        local failed_count
+        failed_count=$(echo "$summary_line" | sed -n 's/.* \([0-9]\+\) failed.*/\1/p')
+        failed_tests=${failed_count:-0}
+
+        # Extract ignored/skipped count
+        local ignored_count
+        ignored_count=$(echo "$summary_line" | sed -n 's/.* \([0-9]\+\) ignored.*/\1/p')
+        skipped_tests=${ignored_count:-0}
+
+        # Calculate total tests
+        total_tests=$((passed_tests + failed_tests + skipped_tests))
+    fi
+
+    # Parse individual test results
+    # Look for lines like: "test test_name ... ok" or "test test_name ... FAILED"
+    local test_lines
+    test_lines=$(echo "$output" | grep -E "^test " | grep -E "\.\.\. (ok|FAILED|ignored)$")
+
+    if [[ -n "$test_lines" ]]; then
+        # Count the individual test results
+        test_details_count=$(echo "$test_lines" | wc -l)
+
+        # Store individual test details (simplified format)
+        local test_index=0
+        while IFS= read -r line; do
+            if [[ $test_index -lt 10 ]]; then  # Limit to first 10 tests to avoid excessive output
+                local test_name
+                test_name=$(echo "$line" | sed -n 's/^test \(.*\) \.\.\. .*$/\1/p')
+                local test_status
+                test_status=$(echo "$line" | sed -n 's/.* \.\.\. \(.*\)$/\1/p')
+
+                if [[ -n "$test_name" ]]; then
+                    test_details="${test_details}test_details_${test_index}_name=$test_name"$'\n'
+                    test_details="${test_details}test_details_${test_index}_status=$test_status"$'\n'
+                    ((test_index++))
+                fi
+            fi
+        done <<< "$test_lines"
+    fi
+
+    # If we couldn't parse from output, fall back to exit code based detection
+    if [[ $total_tests -eq 0 && $test_details_count -eq 0 ]]; then
+        # Check for "running X tests" line as fallback
+        local running_line
+        running_line=$(echo "$output" | grep -E "running [0-9]+ tests" | head -1)
+        if [[ -n "$running_line" ]]; then
+            total_tests=$(echo "$running_line" | sed -n 's/running \([0-9]\+\) tests/\1/p')
+        fi
+
+        # If output is completely empty or no test info found, assume no tests ran
+        if [[ -z "$output" ]] || [[ $total_tests -eq 0 ]]; then
+            total_tests=0
+            passed_tests=0
+            failed_tests=0
+            skipped_tests=0
+        fi
+    fi
+
+    # Determine overall status
+    local status="unknown"
+    if [[ "$exit_code" == "0" && $failed_tests -eq 0 ]]; then
+        status="passed"
+    elif [[ "$exit_code" != "0" || $failed_tests -gt 0 ]]; then
+        status="failed"
+    fi
+
+    # Output results in flat data format
+    echo "total_tests=$total_tests"
+    echo "passed_tests=$passed_tests"
+    echo "failed_tests=$failed_tests"
+    echo "skipped_tests=$skipped_tests"
+    echo "test_details_count=$test_details_count"
+    echo "status=$status"
+
+    # Add individual test details if available
+    if [[ -n "$test_details" ]]; then
+        echo "$test_details"
     fi
 
     return 0
