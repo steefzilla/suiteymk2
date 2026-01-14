@@ -814,12 +814,12 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **3.1.6 Integration Test with Real Docker**
 *Verify build manager works with real Docker: builds projects, creates test images, and verifies artifacts are present.*
-- [ ] **Red**: Write integration test `tests/bats/integration/build_manager.bats`
+- [x] **Red**: Write integration test `tests/bats/integration/build_manager.bats`
   - Test: Build `./example/rust-project/` Rust project
   - Test: Create test image successfully
   - Test: Verify artifacts in test image
-- [ ] **Green**: Ensure real Docker operations work
-- [ ] **Refactor**: Optimize Docker operations
+- [x] **Green**: Ensure real Docker operations work
+- [x] **Refactor**: Optimize Docker operations
 
 **Acceptance Criteria**:
 - Can execute builds in Docker containers
