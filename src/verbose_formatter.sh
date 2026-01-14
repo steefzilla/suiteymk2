@@ -388,3 +388,402 @@ is_verbose_mode_active() {
     fi
 }
 
+# =============================================================================
+# Post-Completion Output (4.1.2)
+# =============================================================================
+
+# Global state for execution records
+# Format: suite_id|status|duration|timestamp
+EXECUTION_RECORDS="${EXECUTION_RECORDS:-}"
+EXECUTION_RECORD_COUNT=0
+
+# Associative arrays for failure/error details
+if [[ -z "${FAILURE_DETAILS_INITIALIZED:-}" ]]; then
+    declare -gA FAILURE_STACK_TRACES 2>/dev/null || declare -A FAILURE_STACK_TRACES
+    declare -gA FAILURE_MESSAGES 2>/dev/null || declare -A FAILURE_MESSAGES
+    declare -gA ERROR_STACK_TRACES 2>/dev/null || declare -A ERROR_STACK_TRACES
+    declare -gA ERROR_MESSAGES 2>/dev/null || declare -A ERROR_MESSAGES
+    FAILURE_DETAILS_INITIALIZED="true"
+fi
+
+# Record a test execution with timestamp for ordering
+# Usage: record_test_execution <suite_id> <status> <duration>
+# Returns: Recording status in flat data format
+record_test_execution() {
+    local suite_id="$1"
+    local status="$2"
+    local duration="$3"
+    local timestamp
+    timestamp=$(date +%s%N 2>/dev/null || date +%s)
+
+    # Create record entry
+    local record="$suite_id|$status|$duration|$timestamp"
+
+    # Append to records
+    if [[ -z "$EXECUTION_RECORDS" ]]; then
+        EXECUTION_RECORDS="$record"
+    else
+        EXECUTION_RECORDS="$EXECUTION_RECORDS"$'\n'"$record"
+    fi
+    ((EXECUTION_RECORD_COUNT++))
+
+    echo "recorded=true"
+    echo "suite_id=$suite_id"
+    echo "status=$status"
+    echo "record_index=$EXECUTION_RECORD_COUNT"
+
+    return 0
+}
+
+# Get execution record for a specific suite
+# Usage: get_execution_record <suite_id>
+# Returns: Execution record in flat data format
+get_execution_record() {
+    local suite_id="$1"
+
+    # Search for the record
+    while IFS='|' read -r rec_suite rec_status rec_duration rec_timestamp; do
+        if [[ "$rec_suite" == "$suite_id" ]]; then
+            echo "suite_id=$rec_suite"
+            echo "status=$rec_status"
+            echo "duration=$rec_duration"
+            echo "timestamp=$rec_timestamp"
+            return 0
+        fi
+    done <<< "$EXECUTION_RECORDS"
+
+    echo "suite_id=$suite_id"
+    echo "found=false"
+    return 1
+}
+
+# Get all suites in execution order
+# Usage: get_execution_order
+# Returns: Suites in execution order in flat data format
+get_execution_order() {
+    local count=0
+
+    # Parse records (they are already in execution order)
+    while IFS='|' read -r rec_suite rec_status rec_duration rec_timestamp; do
+        if [[ -n "$rec_suite" ]]; then
+            echo "suite_id=$rec_suite"
+            echo "order_${count}_suite=$rec_suite"
+            echo "order_${count}_status=$rec_status"
+            echo "order_${count}_duration=$rec_duration"
+            ((count++))
+        fi
+    done <<< "$EXECUTION_RECORDS"
+
+    echo "total_ordered=$count"
+
+    return 0
+}
+
+# Record a test failure with stack trace
+# Usage: record_test_failure <suite_id> <stack_trace> <error_message>
+# Returns: Recording status in flat data format
+record_test_failure() {
+    local suite_id="$1"
+    local stack_trace="$2"
+    local error_message="$3"
+
+    FAILURE_STACK_TRACES[$suite_id]="$stack_trace"
+    FAILURE_MESSAGES[$suite_id]="$error_message"
+
+    echo "failure_recorded=true"
+    echo "suite_id=$suite_id"
+
+    return 0
+}
+
+# Get failure details for a suite
+# Usage: get_failure_details <suite_id>
+# Returns: Failure details in flat data format
+get_failure_details() {
+    local suite_id="$1"
+
+    local stack_trace="${FAILURE_STACK_TRACES[$suite_id]:-}"
+    local error_message="${FAILURE_MESSAGES[$suite_id]:-}"
+
+    echo "suite_id=$suite_id"
+    echo "stack_trace=$stack_trace"
+    echo "error_message=$error_message"
+
+    if [[ -n "$stack_trace" ]] || [[ -n "$error_message" ]]; then
+        echo "has_details=true"
+    else
+        echo "has_details=false"
+    fi
+
+    return 0
+}
+
+# Format failure output with stack trace
+# Usage: format_failure_output <suite_id> <stack_trace> <error_message>
+# Returns: Formatted failure output
+format_failure_output() {
+    local suite_id="$1"
+    local stack_trace="$2"
+    local error_message="$3"
+
+    echo ""
+    echo "══════════════════════════════════════════════════════════════════"
+    echo "  FAILURE: $suite_id"
+    echo "══════════════════════════════════════════════════════════════════"
+    echo ""
+    echo "  Error: $error_message"
+    echo ""
+    echo "  Stack Trace:"
+    
+    # Format each line of stack trace with indentation
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ -n "$line" ]]; then
+            echo "    $line"
+        fi
+    done <<< "$stack_trace"
+    
+    echo ""
+
+    return 0
+}
+
+# Record a test error with stack trace
+# Usage: record_test_error <suite_id> <stack_trace> <error_message>
+# Returns: Recording status in flat data format
+record_test_error() {
+    local suite_id="$1"
+    local stack_trace="$2"
+    local error_message="$3"
+
+    ERROR_STACK_TRACES[$suite_id]="$stack_trace"
+    ERROR_MESSAGES[$suite_id]="$error_message"
+
+    echo "error_recorded=true"
+    echo "suite_id=$suite_id"
+
+    return 0
+}
+
+# Get error details for a suite
+# Usage: get_error_details <suite_id>
+# Returns: Error details in flat data format
+get_error_details() {
+    local suite_id="$1"
+
+    local stack_trace="${ERROR_STACK_TRACES[$suite_id]:-}"
+    local error_message="${ERROR_MESSAGES[$suite_id]:-}"
+
+    echo "suite_id=$suite_id"
+    echo "stack_trace=$stack_trace"
+    echo "error_message=$error_message"
+
+    if [[ -n "$stack_trace" ]] || [[ -n "$error_message" ]]; then
+        echo "has_details=true"
+    else
+        echo "has_details=false"
+    fi
+
+    return 0
+}
+
+# Format error output with stack trace (distinct from failures)
+# Usage: format_error_output <suite_id> <stack_trace> <error_message>
+# Returns: Formatted error output
+format_error_output() {
+    local suite_id="$1"
+    local stack_trace="$2"
+    local error_message="$3"
+
+    echo ""
+    echo "██████████████████████████████████████████████████████████████████"
+    echo "  ERROR: $suite_id"
+    echo "██████████████████████████████████████████████████████████████████"
+    echo ""
+    echo "  Error: $error_message"
+    echo ""
+    echo "  Stack Trace:"
+    
+    # Format each line of stack trace with indentation
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ -n "$line" ]]; then
+            echo "    $line"
+        fi
+    done <<< "$stack_trace"
+    
+    echo ""
+
+    return 0
+}
+
+# Format post-completion summary with all results
+# Usage: format_post_completion_summary
+# Returns: Formatted summary output
+format_post_completion_summary() {
+    local total_suites=0
+    local passed_suites=0
+    local failed_suites=0
+    local error_suites=0
+    local total_duration=0
+
+    # Header
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════════════╗"
+    echo "║                      TEST EXECUTION SUMMARY                       ║"
+    echo "╚══════════════════════════════════════════════════════════════════╝"
+    echo ""
+
+    # Process all execution records in order
+    echo "Test Results (in execution order):"
+    echo "──────────────────────────────────────────────────────────────────"
+    
+    while IFS='|' read -r rec_suite rec_status rec_duration rec_timestamp; do
+        if [[ -n "$rec_suite" ]]; then
+            ((total_suites++))
+            
+            # Calculate total duration
+            if [[ -n "$rec_duration" ]]; then
+                total_duration=$(echo "$total_duration + $rec_duration" | bc 2>/dev/null || echo "$total_duration")
+            fi
+
+            # Count by status
+            case "$rec_status" in
+                passed)
+                    ((passed_suites++))
+                    echo "  ✓ $rec_suite (${rec_duration}s) - PASSED"
+                    ;;
+                failed)
+                    ((failed_suites++))
+                    echo "  ✗ $rec_suite (${rec_duration}s) - FAILED"
+                    ;;
+                error)
+                    ((error_suites++))
+                    echo "  ⚠ $rec_suite (${rec_duration}s) - ERROR"
+                    ;;
+                *)
+                    echo "  ? $rec_suite (${rec_duration}s) - $rec_status"
+                    ;;
+            esac
+        fi
+    done <<< "$EXECUTION_RECORDS"
+
+    echo ""
+
+    # Display failures with stack traces
+    if [[ $failed_suites -gt 0 ]]; then
+        echo "╔══════════════════════════════════════════════════════════════════╗"
+        echo "║                           FAILURES                                ║"
+        echo "╚══════════════════════════════════════════════════════════════════╝"
+        
+        while IFS='|' read -r rec_suite rec_status rec_duration rec_timestamp; do
+            if [[ "$rec_status" == "failed" ]] && [[ -n "$rec_suite" ]]; then
+                local stack_trace="${FAILURE_STACK_TRACES[$rec_suite]:-}"
+                local error_msg="${FAILURE_MESSAGES[$rec_suite]:-No details available}"
+                format_failure_output "$rec_suite" "$stack_trace" "$error_msg"
+            fi
+        done <<< "$EXECUTION_RECORDS"
+    fi
+
+    # Display errors with stack traces
+    if [[ $error_suites -gt 0 ]]; then
+        echo "╔══════════════════════════════════════════════════════════════════╗"
+        echo "║                            ERRORS                                 ║"
+        echo "╚══════════════════════════════════════════════════════════════════╝"
+        
+        while IFS='|' read -r rec_suite rec_status rec_duration rec_timestamp; do
+            if [[ "$rec_status" == "error" ]] && [[ -n "$rec_suite" ]]; then
+                local stack_trace="${ERROR_STACK_TRACES[$rec_suite]:-}"
+                local error_msg="${ERROR_MESSAGES[$rec_suite]:-No details available}"
+                format_error_output "$rec_suite" "$stack_trace" "$error_msg"
+            fi
+        done <<< "$EXECUTION_RECORDS"
+    fi
+
+    # Summary statistics
+    echo "══════════════════════════════════════════════════════════════════"
+    echo "  SUMMARY"
+    echo "══════════════════════════════════════════════════════════════════"
+    echo ""
+    echo "  Total Suites:  $total_suites"
+    echo "  Passed:        $passed_suites"
+    echo "  Failed:        $failed_suites"
+    echo "  Errors:        $error_suites"
+    echo "  Total Time:    ${total_duration}s"
+    echo ""
+
+    # Final status
+    if [[ $failed_suites -eq 0 ]] && [[ $error_suites -eq 0 ]]; then
+        echo "  ✓ All tests passed!"
+    else
+        echo "  ✗ Some tests did not pass."
+    fi
+    echo ""
+
+    return 0
+}
+
+# Clear all execution records
+# Usage: clear_execution_records
+# Returns: Status in flat data format
+clear_execution_records() {
+    EXECUTION_RECORDS=""
+    EXECUTION_RECORD_COUNT=0
+
+    # Clear failure details
+    for key in "${!FAILURE_STACK_TRACES[@]}"; do
+        unset 'FAILURE_STACK_TRACES[$key]'
+    done
+    for key in "${!FAILURE_MESSAGES[@]}"; do
+        unset 'FAILURE_MESSAGES[$key]'
+    done
+
+    # Clear error details
+    for key in "${!ERROR_STACK_TRACES[@]}"; do
+        unset 'ERROR_STACK_TRACES[$key]'
+    done
+    for key in "${!ERROR_MESSAGES[@]}"; do
+        unset 'ERROR_MESSAGES[$key]'
+    done
+
+    echo "cleared=true"
+    echo "records_cleared=$EXECUTION_RECORD_COUNT"
+
+    return 0
+}
+
+# Get total execution statistics
+# Usage: get_total_execution_stats
+# Returns: Aggregate statistics in flat data format
+get_total_execution_stats() {
+    local total_suites=0
+    local passed_suites=0
+    local failed_suites=0
+    local error_suites=0
+    local total_duration=0
+
+    while IFS='|' read -r rec_suite rec_status rec_duration rec_timestamp; do
+        if [[ -n "$rec_suite" ]]; then
+            ((total_suites++))
+            
+            # Calculate total duration
+            if [[ -n "$rec_duration" ]]; then
+                total_duration=$(echo "$total_duration + $rec_duration" | bc 2>/dev/null || echo "$total_duration")
+            fi
+
+            # Count by status
+            case "$rec_status" in
+                passed) ((passed_suites++)) ;;
+                failed) ((failed_suites++)) ;;
+                error) ((error_suites++)) ;;
+            esac
+        fi
+    done <<< "$EXECUTION_RECORDS"
+
+    echo "total_suites=$total_suites"
+    echo "passed_suites=$passed_suites"
+    echo "failed_suites=$failed_suites"
+    echo "error_suites=$error_suites"
+    echo "total_duration=$total_duration"
+
+    return 0
+}
+

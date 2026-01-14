@@ -419,3 +419,269 @@ stderr=Error: assertion failed"
     assert [ -n "$(echo "$active_output" | grep "$suite_3")" ]
 }
 
+# =============================================================================
+# 4.1.2 Post-Completion Output Tests
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Test: Output all tests in execution order
+# -----------------------------------------------------------------------------
+
+@test "record_test_execution() records test with timestamp for ordering" {
+    run record_test_execution "suite-1" "passed" "1.5"
+    assert_success
+    
+    assert_output --partial "recorded=true"
+    assert_output --partial "suite_id=suite-1"
+}
+
+@test "record_test_execution() stores execution metadata" {
+    local result
+    result=$(
+        source src/verbose_formatter.sh
+        record_test_execution "rust-tests" "passed" "2.3" >/dev/null 2>&1
+        get_execution_record "rust-tests"
+    )
+    
+    assert [ -n "$(echo "$result" | grep "suite_id=rust-tests")" ]
+    assert [ -n "$(echo "$result" | grep "status=passed")" ]
+    assert [ -n "$(echo "$result" | grep "duration=2.3")" ]
+}
+
+@test "get_execution_order() returns suites in execution order" {
+    local result
+    result=$(
+        source src/verbose_formatter.sh
+        record_test_execution "suite-first" "passed" "1.0" >/dev/null 2>&1
+        sleep 0.01  # Small delay to ensure ordering
+        record_test_execution "suite-second" "passed" "2.0" >/dev/null 2>&1
+        sleep 0.01
+        record_test_execution "suite-third" "passed" "3.0" >/dev/null 2>&1
+        get_execution_order
+    )
+    
+    # Should list suites in order
+    assert [ -n "$(echo "$result" | grep "suite-first")" ]
+    assert [ -n "$(echo "$result" | grep "suite-second")" ]
+    assert [ -n "$(echo "$result" | grep "suite-third")" ]
+}
+
+@test "format_post_completion_summary() outputs all tests in execution order" {
+    local result
+    result=$(
+        source src/verbose_formatter.sh
+        record_test_execution "alpha-suite" "passed" "1.0" >/dev/null 2>&1
+        record_test_execution "beta-suite" "failed" "2.0" >/dev/null 2>&1
+        record_test_execution "gamma-suite" "passed" "1.5" >/dev/null 2>&1
+        format_post_completion_summary
+    )
+    
+    # Should include all suites
+    assert [ -n "$(echo "$result" | grep "alpha-suite")" ]
+    assert [ -n "$(echo "$result" | grep "beta-suite")" ]
+    assert [ -n "$(echo "$result" | grep "gamma-suite")" ]
+}
+
+# -----------------------------------------------------------------------------
+# Test: Display stack traces for failures
+# -----------------------------------------------------------------------------
+
+@test "record_test_failure() stores failure with stack trace" {
+    local stack_trace="at test_function (test.sh:10)
+at main (test.sh:25)"
+    
+    run record_test_failure "unit-tests" "$stack_trace" "Assertion failed: expected 5 but got 3"
+    assert_success
+    
+    assert_output --partial "failure_recorded=true"
+}
+
+@test "get_failure_details() retrieves stored stack trace" {
+    local stack_trace="at test_addition (math_test.sh:15)
+at run_tests (runner.sh:42)"
+    local error_msg="Expected 10 but got 7"
+    
+    local result
+    result=$(
+        source src/verbose_formatter.sh
+        record_test_failure "math-tests" "$stack_trace" "$error_msg" >/dev/null 2>&1
+        get_failure_details "math-tests"
+    )
+    
+    assert [ -n "$(echo "$result" | grep "test_addition")" ]
+    assert [ -n "$(echo "$result" | grep "math_test.sh:15")" ]
+    assert [ -n "$(echo "$result" | grep "Expected 10")" ]
+}
+
+@test "format_failure_output() displays stack trace with formatting" {
+    local stack_trace="at test_login (auth_test.sh:33)
+at test_suite (suite.sh:100)"
+    local error_msg="Login failed: invalid credentials"
+    
+    run format_failure_output "auth-tests" "$stack_trace" "$error_msg"
+    assert_success
+    
+    # Should include failure header
+    assert_output --partial "FAILURE"
+    # Should include suite name
+    assert_output --partial "auth-tests"
+    # Should include stack trace
+    assert_output --partial "test_login"
+    assert_output --partial "auth_test.sh:33"
+    # Should include error message
+    assert_output --partial "Login failed"
+}
+
+@test "format_post_completion_summary() includes stack traces for failures" {
+    local stack_trace="at failing_test (test.sh:50)"
+    
+    local result
+    result=$(
+        source src/verbose_formatter.sh
+        record_test_execution "passing-suite" "passed" "1.0" >/dev/null 2>&1
+        record_test_execution "failing-suite" "failed" "2.0" >/dev/null 2>&1
+        record_test_failure "failing-suite" "$stack_trace" "Test assertion failed" >/dev/null 2>&1
+        format_post_completion_summary
+    )
+    
+    # Should show stack trace for failing suite
+    assert [ -n "$(echo "$result" | grep "failing_test")" ]
+    assert [ -n "$(echo "$result" | grep "test.sh:50")" ]
+}
+
+# -----------------------------------------------------------------------------
+# Test: Display stack traces for errors
+# -----------------------------------------------------------------------------
+
+@test "record_test_error() stores error with stack trace" {
+    local stack_trace="at broken_function (code.sh:5)
+at test_runner (runner.sh:10)"
+    
+    run record_test_error "integration-tests" "$stack_trace" "Segmentation fault"
+    assert_success
+    
+    assert_output --partial "error_recorded=true"
+}
+
+@test "get_error_details() retrieves stored error information" {
+    local stack_trace="at database_connect (db.sh:20)
+at setup (test.sh:5)"
+    local error_msg="Connection refused: localhost:5432"
+    
+    local result
+    result=$(
+        source src/verbose_formatter.sh
+        record_test_error "db-tests" "$stack_trace" "$error_msg" >/dev/null 2>&1
+        get_error_details "db-tests"
+    )
+    
+    assert [ -n "$(echo "$result" | grep "database_connect")" ]
+    assert [ -n "$(echo "$result" | grep "db.sh:20")" ]
+    assert [ -n "$(echo "$result" | grep "Connection refused")" ]
+}
+
+@test "format_error_output() displays error with distinct formatting" {
+    local stack_trace="at crash_site (broken.sh:99)"
+    local error_msg="Out of memory"
+    
+    run format_error_output "memory-tests" "$stack_trace" "$error_msg"
+    assert_success
+    
+    # Should include error header (different from failure)
+    assert_output --partial "ERROR"
+    # Should include suite name
+    assert_output --partial "memory-tests"
+    # Should include stack trace
+    assert_output --partial "crash_site"
+    # Should include error message
+    assert_output --partial "Out of memory"
+}
+
+@test "format_post_completion_summary() includes stack traces for errors" {
+    local stack_trace="at error_site (broken.sh:77)"
+    
+    local result
+    result=$(
+        source src/verbose_formatter.sh
+        record_test_execution "normal-suite" "passed" "1.0" >/dev/null 2>&1
+        record_test_execution "error-suite" "error" "0.5" >/dev/null 2>&1
+        record_test_error "error-suite" "$stack_trace" "Runtime exception" >/dev/null 2>&1
+        format_post_completion_summary
+    )
+    
+    # Should show stack trace for error suite
+    assert [ -n "$(echo "$result" | grep "error_site")" ]
+    assert [ -n "$(echo "$result" | grep "broken.sh:77")" ]
+}
+
+# -----------------------------------------------------------------------------
+# Test: Post-completion summary formatting
+# -----------------------------------------------------------------------------
+
+@test "format_post_completion_summary() shows overall summary" {
+    local result
+    result=$(
+        source src/verbose_formatter.sh
+        record_test_execution "suite-1" "passed" "1.0" >/dev/null 2>&1
+        record_test_execution "suite-2" "passed" "1.5" >/dev/null 2>&1
+        record_test_execution "suite-3" "failed" "2.0" >/dev/null 2>&1
+        format_post_completion_summary
+    )
+    
+    # Should include summary section
+    assert [ -n "$(echo "$result" | grep -i "summary")" ]
+    # Should show counts (case insensitive - "Passed:" or "passed")
+    assert [ -n "$(echo "$result" | grep -i "passed")" ]
+    # Should show the count of 2 passed suites
+    assert [ -n "$(echo "$result" | grep "2")" ]
+}
+
+@test "format_post_completion_summary() distinguishes failures from errors" {
+    local result
+    result=$(
+        source src/verbose_formatter.sh
+        record_test_execution "fail-suite" "failed" "1.0" >/dev/null 2>&1
+        record_test_failure "fail-suite" "at test (t.sh:1)" "Assertion failed" >/dev/null 2>&1
+        record_test_execution "error-suite" "error" "0.5" >/dev/null 2>&1
+        record_test_error "error-suite" "at crash (c.sh:1)" "Segfault" >/dev/null 2>&1
+        format_post_completion_summary
+    )
+    
+    # Should have distinct sections for failures and errors
+    assert [ -n "$(echo "$result" | grep -i "failure")" ]
+    assert [ -n "$(echo "$result" | grep -i "error")" ]
+}
+
+@test "clear_execution_records() resets all recorded data" {
+    local result
+    result=$(
+        source src/verbose_formatter.sh
+        record_test_execution "suite-1" "passed" "1.0" >/dev/null 2>&1
+        record_test_execution "suite-2" "failed" "2.0" >/dev/null 2>&1
+        clear_execution_records >/dev/null 2>&1
+        get_execution_order
+    )
+    
+    # Should have no suites after clear
+    local count
+    count=$(echo "$result" | grep "^suite_id=" | wc -l)
+    assert [ "$count" -eq 0 ]
+}
+
+@test "get_total_execution_stats() returns aggregate statistics" {
+    local result
+    result=$(
+        source src/verbose_formatter.sh
+        record_test_execution "suite-1" "passed" "1.0" >/dev/null 2>&1
+        record_test_execution "suite-2" "passed" "1.5" >/dev/null 2>&1
+        record_test_execution "suite-3" "failed" "2.0" >/dev/null 2>&1
+        record_test_execution "suite-4" "error" "0.5" >/dev/null 2>&1
+        get_total_execution_stats
+    )
+    
+    assert [ -n "$(echo "$result" | grep "total_suites=4")" ]
+    assert [ -n "$(echo "$result" | grep "passed_suites=2")" ]
+    assert [ -n "$(echo "$result" | grep "failed_suites=1")" ]
+    assert [ -n "$(echo "$result" | grep "error_suites=1")" ]
+}
+
