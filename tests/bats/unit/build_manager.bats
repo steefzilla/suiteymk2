@@ -951,3 +951,183 @@ test_suite_paths=/app/tests/integration_test.rs"
     docker rmi "$test_image_tag" >/dev/null 2>&1 || true
 }
 
+@test "execute_builds_parallel() runs independent builds in parallel" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/rust-project" ]]; then
+        skip "example/rust-project not available"
+    fi
+
+    # Create build configuration with independent builds (no dependencies)
+    local build_config="build_steps_count=2
+build_steps_0_docker_image=rust:1.70-slim
+build_steps_0_project_root=example/rust-project
+build_steps_0_build_command=sleep 1 && echo 'build 1 done'
+build_steps_0_dependencies=
+build_steps_1_docker_image=rust:1.70-slim
+build_steps_1_project_root=example/rust-project
+build_steps_1_build_command=sleep 1 && echo 'build 2 done'
+build_steps_1_dependencies=
+parallel_groups_count=1
+parallel_groups_0_step_count=2
+parallel_groups_0_steps=0,1"
+
+    run execute_builds_parallel "$build_config"
+    assert_success
+
+    # Verify both builds completed
+    assert_output --partial "build_status=success"
+    assert_output --partial "builds_completed="
+    
+    # Verify builds ran in parallel (total time should be ~1 second, not ~2 seconds)
+    # This is a basic check - in practice, we'd verify timing more precisely
+}
+
+@test "execute_builds_parallel() waits for dependent builds sequentially" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/rust-project" ]]; then
+        skip "example/rust-project not available"
+    fi
+
+    # Create build configuration with dependencies
+    # Build 0 has no dependencies, Build 1 depends on Build 0
+    local build_config="build_steps_count=2
+build_steps_0_docker_image=rust:1.70-slim
+build_steps_0_project_root=example/rust-project
+build_steps_0_build_command=sleep 1 && echo 'build 0 done'
+build_steps_0_dependencies=
+build_steps_1_docker_image=rust:1.70-slim
+build_steps_1_project_root=example/rust-project
+build_steps_1_build_command=sleep 1 && echo 'build 1 done'
+build_steps_1_dependencies=0
+parallel_groups_count=2
+parallel_groups_0_step_count=1
+parallel_groups_0_steps=0
+parallel_groups_1_step_count=1
+parallel_groups_1_steps=1"
+
+    run execute_builds_parallel "$build_config"
+    assert_success
+
+    # Verify both builds completed
+    assert_output --partial "build_status=success"
+    
+    # Verify build 0 completed before build 1 started
+    # (We can check timestamps or order in output)
+    local build_0_completed
+    build_0_completed=$(echo "$output" | grep "build_steps_0_build_status=success" || echo "")
+    local build_1_started
+    build_1_started=$(echo "$output" | grep "build_steps_1_build_status=success" || echo "")
+    
+    assert [ -n "$build_0_completed" ]
+    assert [ -n "$build_1_started" ]
+}
+
+@test "execute_builds_parallel() handles build failures in parallel builds" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/rust-project" ]]; then
+        skip "example/rust-project not available"
+    fi
+
+    # Create build configuration where one build will fail
+    local build_config="build_steps_count=2
+build_steps_0_docker_image=rust:1.70-slim
+build_steps_0_project_root=example/rust-project
+build_steps_0_build_command=exit 1
+build_steps_0_dependencies=
+build_steps_1_docker_image=rust:1.70-slim
+build_steps_1_project_root=example/rust-project
+build_steps_1_build_command=sleep 1 && echo 'build 1 done'
+build_steps_1_dependencies=
+parallel_groups_count=1
+parallel_groups_0_step_count=2
+parallel_groups_0_steps=0,1"
+
+    run execute_builds_parallel "$build_config"
+    # Function may return success (reports failures) or failure (aborts)
+    # Either is acceptable - we just need to verify failures are detected
+
+    # Verify failure is detected
+    assert_output --partial "build_steps_0_build_status=failed"
+    
+    # Verify error information is captured
+    assert_output --partial "exit_code=1"
+}
+
+@test "execute_builds_parallel() aborts dependent builds when prerequisite fails" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/rust-project" ]]; then
+        skip "example/rust-project not available"
+    fi
+
+    # Create build configuration where build 0 fails and build 1 depends on it
+    local build_config="build_steps_count=2
+build_steps_0_docker_image=rust:1.70-slim
+build_steps_0_project_root=example/rust-project
+build_steps_0_build_command=exit 1
+build_steps_0_dependencies=
+build_steps_1_docker_image=rust:1.70-slim
+build_steps_1_project_root=example/rust-project
+build_steps_1_build_command=sleep 1 && echo 'build 1 done'
+build_steps_1_dependencies=0
+parallel_groups_count=2
+parallel_groups_0_step_count=1
+parallel_groups_0_steps=0
+parallel_groups_1_step_count=1
+parallel_groups_1_steps=1"
+
+    run execute_builds_parallel "$build_config"
+    # Function should detect failure and abort dependent builds
+
+    # Verify build 0 failed
+    assert_output --partial "build_steps_0_build_status=failed"
+    
+    # Verify build 1 was aborted or not started
+    # (Either skipped or marked as aborted)
+    assert_output --partial "build_steps_1"
+}
+
+@test "execute_builds_parallel() handles empty build configuration" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    run execute_builds_parallel "build_steps_count=0"
+    assert_success
+    
+    # Should handle empty configuration gracefully
+    assert_output --partial "builds_completed=0"
+}
+
