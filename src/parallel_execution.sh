@@ -485,3 +485,506 @@ cleanup_on_exit() {
 
     echo "exit_cleanup_completed" >&2
 }
+
+# =============================================================================
+# Resource Management Functions (3.3.4)
+# =============================================================================
+
+# Global variables for resource pool management
+RESOURCE_POOL_CAPACITY=0
+RESOURCE_POOL_AVAILABLE=0
+RESOURCE_POOL_IN_USE=0
+RESOURCE_POOL_INITIALIZED=""
+
+# Get maximum number of concurrent containers
+# Usage: get_max_concurrent_containers [explicit_limit]
+# Returns: Maximum container count in flat data format
+# Behavior: Returns CPU core count or explicit limit (whichever is smaller)
+get_max_concurrent_containers() {
+    local explicit_limit="${1:-}"
+    local available_cores
+
+    # Get available CPU cores
+    available_cores=$(get_available_cpu_cores 2>/dev/null || echo "4")
+
+    # Ensure we have at least 1 core
+    if [[ -z "$available_cores" ]] || [[ "$available_cores" -lt 1 ]]; then
+        available_cores=1
+    fi
+
+    local max_containers="$available_cores"
+    local limited_by_cpu="false"
+
+    # If explicit limit is provided
+    if [[ -n "$explicit_limit" ]]; then
+        # Validate it's a positive integer
+        if [[ "$explicit_limit" =~ ^[0-9]+$ ]] && [[ "$explicit_limit" -gt 0 ]]; then
+            if [[ "$explicit_limit" -gt "$available_cores" ]]; then
+                # Limit to available cores
+                max_containers="$available_cores"
+                limited_by_cpu="true"
+            else
+                max_containers="$explicit_limit"
+            fi
+        else
+            # Invalid limit, use all available
+            max_containers="$available_cores"
+        fi
+    fi
+
+    # Ensure minimum of 1
+    if [[ "$max_containers" -lt 1 ]]; then
+        max_containers=1
+    fi
+
+    echo "max_containers=$max_containers"
+    echo "available_cores=$available_cores"
+    echo "limited_by_cpu=$limited_by_cpu"
+
+    return 0
+}
+
+# Get the resource pool state file path
+# Usage: _get_pool_state_file
+# Returns: Path to pool state file
+# Note: Can be overridden by SUITEY_POOL_STATE_FILE environment variable for testing
+_get_pool_state_file() {
+    echo "${SUITEY_POOL_STATE_FILE:-/tmp/suitey_resource_pool_$$}"
+}
+
+# Initialize resource pool with given capacity
+# Usage: resource_pool_init [capacity]
+# Returns: Pool initialization status in flat data format
+# Behavior: Initializes pool with CPU cores or custom capacity
+resource_pool_init() {
+    local capacity="${1:-}"
+    local available_cores
+
+    # Get available CPU cores
+    available_cores=$(get_available_cpu_cores 2>/dev/null || echo "4")
+
+    # Ensure we have at least 1 core
+    if [[ -z "$available_cores" ]] || [[ "$available_cores" -lt 1 ]]; then
+        available_cores=1
+    fi
+
+    # Use custom capacity or default to available cores
+    if [[ -n "$capacity" ]] && [[ "$capacity" =~ ^[0-9]+$ ]] && [[ "$capacity" -gt 0 ]]; then
+        # Limit capacity to available cores
+        if [[ "$capacity" -gt "$available_cores" ]]; then
+            capacity="$available_cores"
+        fi
+    else
+        capacity="$available_cores"
+    fi
+
+    # Ensure minimum of 1
+    if [[ "$capacity" -lt 1 ]]; then
+        capacity=1
+    fi
+
+    # Initialize pool state
+    RESOURCE_POOL_CAPACITY="$capacity"
+    RESOURCE_POOL_AVAILABLE="$capacity"
+    RESOURCE_POOL_IN_USE=0
+    RESOURCE_POOL_INITIALIZED="true"
+
+    # Create pool state file for persistence across subshells
+    local pool_state_file
+    pool_state_file=$(_get_pool_state_file)
+    echo "capacity=$capacity" > "$pool_state_file"
+    echo "available=$capacity" >> "$pool_state_file"
+    echo "in_use=0" >> "$pool_state_file"
+
+    echo "pool_capacity=$capacity"
+    echo "pool_available=$capacity"
+    echo "pool_in_use=0"
+    echo "pool_status=initialized"
+
+    return 0
+}
+
+# Acquire resources from pool
+# Usage: resource_pool_acquire <count> [no_wait]
+# Returns: Acquisition status in flat data format
+# Behavior: Acquires specified number of resources if available
+resource_pool_acquire() {
+    local count="${1:-1}"
+    local no_wait="${2:-}"
+
+    # Validate count
+    if ! [[ "$count" =~ ^[0-9]+$ ]] || [[ "$count" -lt 1 ]]; then
+        count=1
+    fi
+
+    # Read current pool state
+    local pool_state_file
+    pool_state_file=$(_get_pool_state_file)
+    local available=0
+    local capacity=0
+    local in_use=0
+
+    if [[ -f "$pool_state_file" ]]; then
+        available=$(grep "^available=" "$pool_state_file" 2>/dev/null | cut -d'=' -f2 || echo "0")
+        capacity=$(grep "^capacity=" "$pool_state_file" 2>/dev/null | cut -d'=' -f2 || echo "0")
+        in_use=$(grep "^in_use=" "$pool_state_file" 2>/dev/null | cut -d'=' -f2 || echo "0")
+    else
+        # Pool not initialized, use global variables
+        available="$RESOURCE_POOL_AVAILABLE"
+        capacity="$RESOURCE_POOL_CAPACITY"
+        in_use="$RESOURCE_POOL_IN_USE"
+    fi
+
+    # Ensure numeric values
+    available="${available:-0}"
+    capacity="${capacity:-0}"
+    in_use="${in_use:-0}"
+
+    # Check if resources are available
+    if [[ "$available" -lt "$count" ]]; then
+        echo "acquired=0"
+        echo "requested=$count"
+        echo "available=$available"
+        echo "acquire_status=exhausted"
+        return 1
+    fi
+
+    # Acquire resources
+    local new_available=$((available - count))
+    local new_in_use=$((in_use + count))
+
+    # Update pool state
+    RESOURCE_POOL_AVAILABLE="$new_available"
+    RESOURCE_POOL_IN_USE="$new_in_use"
+
+    # Update state file
+    if [[ -f "$pool_state_file" ]]; then
+        echo "capacity=$capacity" > "$pool_state_file"
+        echo "available=$new_available" >> "$pool_state_file"
+        echo "in_use=$new_in_use" >> "$pool_state_file"
+    fi
+
+    echo "acquired=$count"
+    echo "pool_available=$new_available"
+    echo "pool_in_use=$new_in_use"
+    echo "acquire_status=success"
+
+    return 0
+}
+
+# Release resources back to pool
+# Usage: resource_pool_release <count>
+# Returns: Release status in flat data format
+# Behavior: Releases specified number of resources back to pool
+resource_pool_release() {
+    local count="${1:-1}"
+
+    # Validate count
+    if ! [[ "$count" =~ ^[0-9]+$ ]] || [[ "$count" -lt 1 ]]; then
+        count=1
+    fi
+
+    # Read current pool state
+    local pool_state_file
+    pool_state_file=$(_get_pool_state_file)
+    local available=0
+    local capacity=0
+    local in_use=0
+
+    if [[ -f "$pool_state_file" ]]; then
+        available=$(grep "^available=" "$pool_state_file" 2>/dev/null | cut -d'=' -f2 || echo "0")
+        capacity=$(grep "^capacity=" "$pool_state_file" 2>/dev/null | cut -d'=' -f2 || echo "0")
+        in_use=$(grep "^in_use=" "$pool_state_file" 2>/dev/null | cut -d'=' -f2 || echo "0")
+    else
+        # Pool not initialized, use global variables
+        available="$RESOURCE_POOL_AVAILABLE"
+        capacity="$RESOURCE_POOL_CAPACITY"
+        in_use="$RESOURCE_POOL_IN_USE"
+    fi
+
+    # Ensure numeric values
+    available="${available:-0}"
+    capacity="${capacity:-0}"
+    in_use="${in_use:-0}"
+
+    # Don't release more than in use
+    if [[ "$count" -gt "$in_use" ]]; then
+        count="$in_use"
+    fi
+
+    # Release resources
+    local new_available=$((available + count))
+    local new_in_use=$((in_use - count))
+
+    # Don't exceed capacity
+    if [[ "$new_available" -gt "$capacity" ]]; then
+        new_available="$capacity"
+    fi
+
+    # Ensure non-negative
+    if [[ "$new_in_use" -lt 0 ]]; then
+        new_in_use=0
+    fi
+
+    # Update pool state
+    RESOURCE_POOL_AVAILABLE="$new_available"
+    RESOURCE_POOL_IN_USE="$new_in_use"
+
+    # Update state file
+    if [[ -f "$pool_state_file" ]]; then
+        echo "capacity=$capacity" > "$pool_state_file"
+        echo "available=$new_available" >> "$pool_state_file"
+        echo "in_use=$new_in_use" >> "$pool_state_file"
+    fi
+
+    echo "released=$count"
+    echo "pool_available=$new_available"
+    echo "pool_in_use=$new_in_use"
+    echo "release_status=success"
+
+    return 0
+}
+
+# Get resource pool status
+# Usage: resource_pool_status
+# Returns: Current pool state in flat data format
+resource_pool_status() {
+    # Read current pool state
+    local pool_state_file
+    pool_state_file=$(_get_pool_state_file)
+    local available=0
+    local capacity=0
+    local in_use=0
+
+    if [[ -f "$pool_state_file" ]]; then
+        available=$(grep "^available=" "$pool_state_file" 2>/dev/null | cut -d'=' -f2 || echo "0")
+        capacity=$(grep "^capacity=" "$pool_state_file" 2>/dev/null | cut -d'=' -f2 || echo "0")
+        in_use=$(grep "^in_use=" "$pool_state_file" 2>/dev/null | cut -d'=' -f2 || echo "0")
+    else
+        # Pool not initialized, use global variables
+        available="$RESOURCE_POOL_AVAILABLE"
+        capacity="$RESOURCE_POOL_CAPACITY"
+        in_use="$RESOURCE_POOL_IN_USE"
+    fi
+
+    echo "pool_capacity=${capacity:-0}"
+    echo "pool_available=${available:-0}"
+    echo "pool_in_use=${in_use:-0}"
+
+    if [[ -n "$RESOURCE_POOL_INITIALIZED" ]] || [[ -f "$pool_state_file" ]]; then
+        echo "pool_status=active"
+    else
+        echo "pool_status=not_initialized"
+    fi
+
+    return 0
+}
+
+# Clean up only completed (stopped) containers
+# Usage: cleanup_completed_containers
+# Returns: Cleanup status in flat data format
+# Behavior: Only cleans up stopped containers, leaves running ones alone
+cleanup_completed_containers() {
+    local cleaned_count=0
+    local skipped_count=0
+
+    for container_id in $ACTIVE_CONTAINERS; do
+        if [[ -n "$container_id" ]]; then
+            # Check container status
+            local container_status
+            container_status=$(docker inspect --format='{{.State.Status}}' "$container_id" 2>/dev/null || echo "unknown")
+
+            if [[ "$container_status" != "running" ]] && [[ "$container_status" != "unknown" ]]; then
+                # Container is stopped, clean it up
+                docker rm "$container_id" >/dev/null 2>&1 || true
+                ((cleaned_count++))
+            else
+                ((skipped_count++))
+            fi
+        fi
+    done
+
+    echo "containers_cleaned=$cleaned_count"
+    echo "containers_skipped=$skipped_count"
+    echo "cleanup_status=success"
+
+    return 0
+}
+
+# Clean up all suitey containers (by name pattern)
+# Usage: cleanup_all_suitey_containers
+# Returns: Cleanup status in flat data format
+# Behavior: Finds and removes all containers matching suitey naming pattern
+cleanup_all_suitey_containers() {
+    local cleaned_count=0
+
+    # Find all suitey containers by name pattern
+    local suitey_containers
+    suitey_containers=$(docker ps -a --filter "name=suitey-" --format "{{.ID}}" 2>/dev/null || echo "")
+
+    for container_id in $suitey_containers; do
+        if [[ -n "$container_id" ]]; then
+            # Stop if running
+            docker stop "$container_id" >/dev/null 2>&1 || true
+            # Remove container
+            docker rm "$container_id" >/dev/null 2>&1 || true
+            ((cleaned_count++))
+        fi
+    done
+
+    echo "containers_cleaned=$cleaned_count"
+    echo "cleanup_status=success"
+
+    return 0
+}
+
+# Register container for tracking and cleanup
+# Usage: register_container_for_cleanup <container_id>
+# Returns: Registration status in flat data format
+register_container_for_cleanup() {
+    local container_id="$1"
+
+    if [[ -z "$container_id" ]]; then
+        echo "registered="
+        echo "register_status=error"
+        echo "error_message=container_id is required"
+        return 1
+    fi
+
+    # Add to tracking list (avoid duplicates)
+    if [[ "$ACTIVE_CONTAINERS" != *"$container_id"* ]]; then
+        if [[ -z "$ACTIVE_CONTAINERS" ]]; then
+            ACTIVE_CONTAINERS="$container_id"
+        else
+            ACTIVE_CONTAINERS="$ACTIVE_CONTAINERS $container_id"
+        fi
+    fi
+
+    echo "registered=$container_id"
+    echo "register_status=success"
+    echo "total_tracked=$(echo "$ACTIVE_CONTAINERS" | wc -w | tr -d ' ')"
+
+    return 0
+}
+
+# Unregister container from tracking
+# Usage: unregister_container <container_id>
+# Returns: Unregistration status in flat data format
+unregister_container() {
+    local container_id="$1"
+
+    if [[ -z "$container_id" ]]; then
+        echo "unregistered="
+        echo "unregister_status=error"
+        echo "error_message=container_id is required"
+        return 1
+    fi
+
+    # Remove from tracking list
+    local new_list=""
+    for tracked_id in $ACTIVE_CONTAINERS; do
+        if [[ "$tracked_id" != "$container_id" ]]; then
+            if [[ -z "$new_list" ]]; then
+                new_list="$tracked_id"
+            else
+                new_list="$new_list $tracked_id"
+            fi
+        fi
+    done
+
+    ACTIVE_CONTAINERS="$new_list"
+
+    echo "unregistered=$container_id"
+    echo "unregister_status=success"
+    echo "remaining_containers=$(echo "$ACTIVE_CONTAINERS" | wc -w | tr -d ' ')"
+
+    return 0
+}
+
+# Clean up on completion (containers and temp files)
+# Usage: cleanup_on_completion
+# Returns: Cleanup status in flat data format
+# Behavior: Cleans up all resources at end of execution
+cleanup_on_completion() {
+    local containers_cleaned=0
+    local temp_files_removed=0
+    local pool_released="false"
+
+    # Clean up containers first
+    if [[ -n "$ACTIVE_CONTAINERS" ]]; then
+        local cleanup_result
+        cleanup_result=$(cleanup_containers 2>&1)
+        containers_cleaned=$(echo "$cleanup_result" | grep "^containers_cleaned=" | cut -d'=' -f2 || echo "0")
+    fi
+
+    # Release resource pool BEFORE cleaning temp files
+    # (cleanup_temp_files removes all suitey_* files including pool state)
+    local pool_state_file
+    pool_state_file=$(_get_pool_state_file)
+    if [[ -f "$pool_state_file" ]]; then
+        rm -f "$pool_state_file" 2>/dev/null || true
+        pool_released="true"
+    fi
+
+    # Reset pool state
+    RESOURCE_POOL_CAPACITY=0
+    RESOURCE_POOL_AVAILABLE=0
+    RESOURCE_POOL_IN_USE=0
+    RESOURCE_POOL_INITIALIZED=""
+
+    # Clean up remaining temp files
+    local temp_result
+    temp_result=$(cleanup_temp_files 2>&1)
+    temp_files_removed=$(echo "$temp_result" | grep "^temp_files_removed=" | cut -d'=' -f2 || echo "0")
+
+    echo "cleanup_status=complete"
+    echo "containers_cleaned=${containers_cleaned:-0}"
+    echo "temp_files_removed=${temp_files_removed:-0}"
+    echo "pool_released=$pool_released"
+
+    return 0
+}
+
+# Get count of active (tracked) containers
+# Usage: get_active_container_count
+# Returns: Count in flat data format
+get_active_container_count() {
+    local count=0
+
+    if [[ -n "$ACTIVE_CONTAINERS" ]]; then
+        count=$(echo "$ACTIVE_CONTAINERS" | wc -w | tr -d ' ')
+    fi
+
+    echo "active_count=$count"
+
+    return 0
+}
+
+# Check if resources are available in pool
+# Usage: is_resource_available
+# Returns: Availability status in flat data format
+is_resource_available() {
+    # Read current pool state
+    local pool_state_file
+    pool_state_file=$(_get_pool_state_file)
+    local available=0
+
+    if [[ -f "$pool_state_file" ]]; then
+        available=$(grep "^available=" "$pool_state_file" 2>/dev/null | cut -d'=' -f2 || echo "0")
+    else
+        available="$RESOURCE_POOL_AVAILABLE"
+    fi
+
+    # Ensure numeric
+    available="${available:-0}"
+
+    if [[ "$available" -gt 0 ]]; then
+        echo "available=true"
+        echo "pool_available=$available"
+    else
+        echo "available=false"
+        echo "pool_available=$available"
+    fi
+
+    return 0
+}

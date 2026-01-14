@@ -967,12 +967,12 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **3.3.4 Resource Management**
 *Limit concurrent containers by CPU count, clean up containers after completion, and remove temporary files from /tmp.*
-- [ ] **Red**: Write tests for resource management
+- [x] **Red**: Write tests for resource management
   - Test: Limit concurrent containers by CPU count
   - Test: Clean up containers after completion
   - Test: Clean up temporary files in `/tmp`
-- [ ] **Green**: Implement resource management
-- [ ] **Refactor**: Optimize resource usage
+- [x] **Green**: Implement resource management
+- [x] **Refactor**: Optimize resource usage
 
 **3.3.5 Memory Resource Management**
 *Implement memory detection, allocation, and monitoring for parallel execution with configurable memory limits.*
