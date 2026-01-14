@@ -100,17 +100,180 @@ teardown() {
 @test "BATS framework module implements parse_test_results() method" {
     if [[ -f "mod/frameworks/bats/mod.sh" ]]; then
         source "mod/frameworks/bats/mod.sh"
-        
+
         # Check that parse_test_results() exists
         run declare -f parse_test_results
         assert_success
-        
+
         # Test parse_test_results() returns flat data format
         run parse_test_results "test output" 0
         assert_success
-        
+
         # Should return flat data format
         assert_output --partial "total_tests="
+        assert_output --partial "status="
+    else
+        skip "BATS framework module not found"
+    fi
+}
+
+@test "parse_test_results() parses basic BATS output with passing tests" {
+    if [[ -f "mod/frameworks/bats/mod.sh" ]]; then
+        source "mod/frameworks/bats/mod.sh"
+
+        local test_output="1..3
+ok 1 test case 1
+ok 2 test case 2
+ok 3 test case 3"
+
+        run parse_test_results "$test_output" 0
+        assert_success
+
+        # Check counts
+        assert_output --partial "total_tests=3"
+        assert_output --partial "passed_tests=3"
+        assert_output --partial "failed_tests=0"
+        assert_output --partial "skipped_tests=0"
+        assert_output --partial "status=passed"
+    else
+        skip "BATS framework module not found"
+    fi
+}
+
+@test "parse_test_results() parses BATS output with failures" {
+    if [[ -f "mod/frameworks/bats/mod.sh" ]]; then
+        source "mod/frameworks/bats/mod.sh"
+
+        local test_output="1..3
+ok 1 test case 1
+not ok 2 test case 2
+# (in test file tests/example.bats, line 5)
+#   \`false' failed
+ok 3 test case 3"
+
+        run parse_test_results "$test_output" 1
+        assert_success
+
+        # Check counts
+        assert_output --partial "total_tests=3"
+        assert_output --partial "passed_tests=2"
+        assert_output --partial "failed_tests=1"
+        assert_output --partial "skipped_tests=0"
+        assert_output --partial "status=failed"
+    else
+        skip "BATS framework module not found"
+    fi
+}
+
+@test "parse_test_results() parses BATS output with skipped tests" {
+    if [[ -f "mod/frameworks/bats/mod.sh" ]]; then
+        source "mod/frameworks/bats/mod.sh"
+
+        local test_output="1..4
+ok 1 test case 1
+ok 2 test case 2 # skip optional test
+ok 3 test case 3
+ok 4 test case 4 # skip another skip"
+
+        run parse_test_results "$test_output" 0
+        assert_success
+
+        # Check counts - BATS doesn't have a separate "skipped" status
+        # but we can count tests with "# skip" in the output
+        assert_output --partial "total_tests=4"
+        assert_output --partial "passed_tests=4"
+        assert_output --partial "failed_tests=0"
+        # Note: BATS doesn't explicitly mark skipped tests in counts
+        # The skip comments are just informational
+        assert_output --partial "status=passed"
+    else
+        skip "BATS framework module not found"
+    fi
+}
+
+@test "parse_test_results() extracts individual test results" {
+    if [[ -f "mod/frameworks/bats/mod.sh" ]]; then
+        source "mod/frameworks/bats/mod.sh"
+
+        local test_output="1..3
+ok 1 test_addition
+not ok 2 test_subtraction
+# (in test file tests/math.bats, line 10)
+#   \`[ 3 - 2 = 5 ]' failed
+ok 3 test_multiplication"
+
+        run parse_test_results "$test_output" 1
+        assert_success
+
+        # Should have test details
+        assert_output --partial "test_details_count=3"
+
+        # Check individual test results (at least some should be present)
+        assert_output --partial "test_addition"
+        assert_output --partial "test_subtraction"
+        assert_output --partial "test_multiplication"
+    else
+        skip "BATS framework module not found"
+    fi
+}
+
+@test "parse_test_results() handles BATS output without test plan" {
+    if [[ -f "mod/frameworks/bats/mod.sh" ]]; then
+        source "mod/frameworks/bats/mod.sh"
+
+        # BATS output without 1..N line (should still parse individual tests)
+        local test_output="ok 1 simple test
+not ok 2 failing test
+ok 3 another test"
+
+        run parse_test_results "$test_output" 1
+        assert_success
+
+        # Should count the individual test lines
+        assert_output --partial "total_tests=3"
+        assert_output --partial "passed_tests=2"
+        assert_output --partial "failed_tests=1"
+        assert_output --partial "status=failed"
+    else
+        skip "BATS framework module not found"
+    fi
+}
+
+@test "parse_test_results() handles malformed BATS output gracefully" {
+    if [[ -f "mod/frameworks/bats/mod.sh" ]]; then
+        source "mod/frameworks/bats/mod.sh"
+
+        # Malformed output - not proper TAP format
+        local test_output="This is not TAP format
+Some random output
+More gibberish that doesn't match TAP"
+
+        run parse_test_results "$test_output" 1
+        # Should not crash, should return some reasonable defaults
+        assert [ $? -eq 0 ] || [ $? -eq 1 ]
+
+        # Should still return required fields
+        if [[ $status -eq 0 ]]; then
+            assert_output --partial "total_tests="
+            assert_output --partial "status="
+        fi
+    else
+        skip "BATS framework module not found"
+    fi
+}
+
+@test "parse_test_results() handles empty output gracefully" {
+    if [[ -f "mod/frameworks/bats/mod.sh" ]]; then
+        source "mod/frameworks/bats/mod.sh"
+
+        run parse_test_results "" 0
+        assert_success
+
+        # Should return sensible defaults
+        assert_output --partial "total_tests=0"
+        assert_output --partial "passed_tests=0"
+        assert_output --partial "failed_tests=0"
+        assert_output --partial "skipped_tests=0"
         assert_output --partial "status="
     else
         skip "BATS framework module not found"

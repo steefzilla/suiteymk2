@@ -223,22 +223,114 @@ parse_test_results() {
     local output="$1"
     local exit_code="$2"
 
-    # Stub implementation (will be expanded in later phases)
-    # For now, return basic structure based on exit code
-    if [[ "$exit_code" == "0" ]]; then
-        echo "total_tests=0"
-        echo "passed_tests=0"
-        echo "failed_tests=0"
-        echo "skipped_tests=0"
-        echo "test_details_count=0"
-        echo "status=passed"
-    else
-        echo "total_tests=0"
-        echo "passed_tests=0"
-        echo "failed_tests=0"
-        echo "skipped_tests=0"
-        echo "test_details_count=0"
-        echo "status=failed"
+    # Initialize counters
+    local total_tests=0
+    local passed_tests=0
+    local failed_tests=0
+    local skipped_tests=0
+    local test_details_count=0
+    local test_details=""
+
+    # Parse test plan line (e.g., "1..5")
+    # Look for the plan line
+    local plan_line
+    plan_line=$(echo "$output" | grep -E "^[0-9]+\.\.[0-9]+$" | head -1)
+
+    if [[ -n "$plan_line" ]]; then
+        # Extract total tests from plan line (format: "1..N")
+        total_tests=$(echo "$plan_line" | cut -d'.' -f3)
+    fi
+
+    # Parse individual test results
+    # Look for lines like: "ok N description" or "not ok N description"
+    local test_lines
+    test_lines=$(echo "$output" | grep -E "^(ok|not ok) [0-9]+")
+
+    if [[ -n "$test_lines" ]]; then
+        # Count the individual test results
+        test_details_count=$(echo "$test_lines" | wc -l)
+
+        # Count passed and failed tests
+        passed_tests=$(echo "$test_lines" | grep -c "^ok ")
+        failed_tests=$(echo "$test_lines" | grep -c "^not ok ")
+
+        # If we didn't get total from plan, use the count of test lines
+        if [[ $total_tests -eq 0 ]]; then
+            total_tests=$test_details_count
+        fi
+
+        # Store individual test details (simplified format)
+        local test_index=0
+        while IFS= read -r line; do
+            if [[ $test_index -lt 10 ]]; then  # Limit to first 10 tests to avoid excessive output
+                local test_status
+                local test_number
+                local test_name
+
+                if [[ "$line" =~ ^ok\ ([0-9]+)\ (.*)$ ]]; then
+                    test_status="ok"
+                    test_number="${BASH_REMATCH[1]}"
+                    test_name="${BASH_REMATCH[2]}"
+                elif [[ "$line" =~ ^not\ ok\ ([0-9]+)\ (.*)$ ]]; then
+                    test_status="not ok"
+                    test_number="${BASH_REMATCH[1]}"
+                    test_name="${BASH_REMATCH[2]}"
+                fi
+
+                if [[ -n "$test_name" ]]; then
+                    test_details="${test_details}test_details_${test_index}_name=$test_name"$'\n'
+                    test_details="${test_details}test_details_${test_index}_status=$test_status"$'\n'
+                    ((test_index++))
+                fi
+            fi
+        done <<< "$test_lines"
+    fi
+
+    # Handle BATS skip comments (# skip)
+    # BATS marks skipped tests with "# skip" comments in the output
+    local skip_count
+    skip_count=$(echo "$output" | grep -c "# skip")
+    skipped_tests=$skip_count
+
+    # If we couldn't parse from output, fall back to exit code based detection
+    if [[ $total_tests -eq 0 && $test_details_count -eq 0 ]]; then
+        # If output is completely empty, assume no tests ran
+        if [[ -z "$output" ]]; then
+            total_tests=0
+            passed_tests=0
+            failed_tests=0
+            skipped_tests=0
+        else
+            # Try to count any ok/not ok lines as fallback
+            local any_test_lines
+            any_test_lines=$(echo "$output" | grep -c -E "^(ok|not ok)")
+            if [[ $any_test_lines -gt 0 ]]; then
+                total_tests=$any_test_lines
+                passed_tests=$(echo "$output" | grep -c "^ok")
+                failed_tests=$(echo "$output" | grep -c "^not ok")
+            fi
+        fi
+    fi
+
+    # Determine overall status
+    local status="unknown"
+    if [[ "$exit_code" == "0" && $failed_tests -eq 0 ]]; then
+        status="passed"
+    elif [[ "$exit_code" != "0" || $failed_tests -gt 0 ]]; then
+        status="failed"
+    fi
+
+    # Output results in flat data format
+    echo "total_tests=$total_tests"
+    echo "passed_tests=$passed_tests"
+    echo "failed_tests=$failed_tests"
+    echo "skipped_tests=$skipped_tests"
+    echo "test_details_count=$test_details_count"
+    echo "status=$status"
+
+    # Add individual test details if available
+    if [[ -n "$test_details" ]]; then
+        echo "$test_details"
     fi
 
     return 0

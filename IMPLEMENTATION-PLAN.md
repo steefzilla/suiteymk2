@@ -906,18 +906,18 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **3.2.7 BATS Test Output Parsing**
 *Implement actual parsing logic in BATS module to extract test counts and individual test results from `bats` output.*
-- [ ] **Red**: Write tests for BATS parsing
+- [x] **Red**: Write tests for BATS parsing
   - Test: Parse basic BATS output (1..N test plan, ok/not ok lines)
   - Test: Parse BATS output with test names and status
   - Test: Parse BATS output with failures (extract failure output)
   - Test: Parse BATS output with skipped tests
   - Test: Handle malformed BATS output gracefully
-- [ ] **Green**: Implement parsing in `mod/frameworks/bats/mod.sh`
+- [x] **Green**: Implement parsing in `mod/frameworks/bats/mod.sh`
   - Parse "1..N" test plan line
   - Parse "ok/not ok N test_name" lines
   - Extract test names and pass/fail status
   - Handle test failure output and diagnostics
-- [ ] **Refactor**: Improve parsing robustness and accuracy
+- [x] **Refactor**: Improve parsing robustness and accuracy
 
 **Acceptance Criteria**:
 - Can execute tests in Docker containers
