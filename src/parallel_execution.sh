@@ -295,7 +295,8 @@ poll_test_results() {
         local random_part=""
 
         # Parse filename: suitey_test_result_<suite_id>_<pid>_<random>
-        if [[ "$filename" =~ suitey_test_result_(.+)_(.+)_(.+)$ ]]; then
+        # Use numeric pattern for pid and random to handle suite_ids with underscores
+        if [[ "$filename" =~ suitey_test_result_(.+)_([0-9]+)_([0-9]+)$ ]]; then
             suite_id="${BASH_REMATCH[1]}"
             pid_part="${BASH_REMATCH[2]}"
             random_part="${BASH_REMATCH[3]}"

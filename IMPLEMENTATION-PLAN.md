@@ -1044,13 +1044,13 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **4.2.1 Dashboard Display**
 *Display real-time dashboard with columns showing suite status, build status, and test counts that update as tests execute.*
-- [ ] **Red**: Write test `tests/bats/unit/dashboard_formatter.bats`
+- [x] **Red**: Write test `tests/bats/unit/dashboard_formatter.bats`
   - Test: Display dashboard header with columns
   - Test: Update suite status in real-time
   - Test: Display build status when builds in progress
   - Test: Update test counts as tests complete
-- [ ] **Green**: Implement dashboard formatter in `src/dashboard_formatter.sh`
-- [ ] **Refactor**: Improve display formatting, optimize updates
+- [x] **Green**: Implement dashboard formatter in `src/dashboard_formatter.sh`
+- [x] **Refactor**: Improve display formatting, optimize updates
 
 **4.2.2 Real-Time Updates**
 *Poll /tmp for result files (using unique filename pattern per Test Guidelines), update dashboard when new results are available, and refresh display without flickering.*
