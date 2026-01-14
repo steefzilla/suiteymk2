@@ -13,6 +13,9 @@ setup() {
     # Source the build.sh functions
     source build.sh
 
+    # Create a unique identifier for this test to avoid race conditions with parallel tests
+    TEST_UNIQUE_ID="buildtest_${BATS_TEST_NUMBER}_$$_${RANDOM}"
+
     # Create a temporary directory for test builds
     export TEST_BUILD_DIR="$(mktemp -d)"
 }
@@ -22,6 +25,13 @@ teardown() {
     if [[ -n "$TEST_BUILD_DIR" && -d "$TEST_BUILD_DIR" ]]; then
         rm -rf "$TEST_BUILD_DIR"
     fi
+
+    # Clean up any files created by THIS test (using unique ID)
+    if [[ -n "$TEST_UNIQUE_ID" ]]; then
+        rm -f /tmp/*"${TEST_UNIQUE_ID}"* 2>/dev/null || true
+    fi
+
+    unset TEST_UNIQUE_ID
 }
 
 @test "build creates output file in specified location" {
@@ -75,7 +85,7 @@ teardown() {
     local output_file="$TEST_BUILD_DIR/suitey.sh"
 
     # Create some files outside allowed directories to test isolation
-    local outside_file="/tmp/outside_test_$$.txt"
+    local outside_file="/tmp/outside_test_${TEST_UNIQUE_ID}.txt"
     echo "outside file" > "$outside_file"
 
     run ./build.sh --output "$output_file"
@@ -92,20 +102,33 @@ teardown() {
 @test "build cleans up temporary files in /tmp" {
     local output_file="$TEST_BUILD_DIR/suitey.sh"
 
-    # Count existing files in /tmp before build
-    local tmp_files_before
-    tmp_files_before=$(find /tmp -maxdepth 1 -name "suitey_*" 2>/dev/null | wc -l)
+    # Create a suitey_ temp file that should be cleaned up
+    local suitey_temp_file="/tmp/suitey_buildtest_${TEST_UNIQUE_ID}"
+    echo "should be cleaned" > "$suitey_temp_file"
+
+    # Create a non-suitey marker file that should NOT be cleaned up
+    local marker_file="/tmp/test_marker_${TEST_UNIQUE_ID}"
+    echo "marker" > "$marker_file"
+
+    # Verify both files exist
+    assert [ -f "$suitey_temp_file" ]
+    assert [ -f "$marker_file" ]
 
     run ./build.sh --output "$output_file"
     assert_success
 
-    # Count files in /tmp after build
-    local tmp_files_after
-    tmp_files_after=$(find /tmp -maxdepth 1 -name "suitey_*" 2>/dev/null | wc -l)
+    # Verify the build succeeded and created output
+    assert [ -f "$output_file" ]
 
-    # Should not leave behind suitey temp files
-    # Note: This is a basic check - the build process uses mktemp which should clean up
-    assert_equal "$tmp_files_before" "$tmp_files_after"
+    # The build calls cleanup_build_artifacts which removes suitey_* files
+    # Our suitey_ temp file should have been cleaned up
+    refute [ -f "$suitey_temp_file" ]
+
+    # Our non-suitey marker file should still exist
+    assert [ -f "$marker_file" ]
+
+    # Clean up marker
+    rm -f "$marker_file"
 }
 
 @test "build handles relative output paths" {
@@ -134,9 +157,9 @@ teardown() {
 }
 
 @test "cleanup_build_artifacts removes temporary files" {
-    # Create some mock temporary files
-    local temp_file1="/tmp/suitey_temp_$$_1"
-    local temp_file2="/tmp/suitey_temp_$$_2"
+    # Create some mock temporary files with unique identifiers
+    local temp_file1="/tmp/suitey_temp_${TEST_UNIQUE_ID}_1"
+    local temp_file2="/tmp/suitey_temp_${TEST_UNIQUE_ID}_2"
     echo "temp1" > "$temp_file1"
     echo "temp2" > "$temp_file2"
 
@@ -147,7 +170,8 @@ teardown() {
     run cleanup_build_artifacts
     assert_success
 
-    # Files should still exist (cleanup is selective)
-    # This test verifies the cleanup function exists and runs
-    # In a real scenario, we'd test specific cleanup logic
+    # cleanup_build_artifacts removes suitey_* files in /tmp
+    # Verify the files were cleaned up
+    refute [ -f "$temp_file1" ]
+    refute [ -f "$temp_file2" ]
 }

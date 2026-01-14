@@ -976,19 +976,23 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **3.3.5 Memory Resource Management**
 *Implement memory detection, allocation, and monitoring for parallel execution with configurable memory limits.*
-- [ ] **Red**: Write tests for memory resource management
+- [x] **Red**: Write tests for memory resource management
   - Test: Detect available system memory
   - Test: Calculate memory per container based on parallelism
   - Test: Apply memory limits to Docker containers
   - Test: Handle memory allocation failures gracefully
   - Test: CLI memory options (--max-memory-per-container, --total-memory-limit, --memory-headroom)
-- [ ] **Green**: Implement memory resource management
+- [x] **Green**: Implement memory resource management
   - Implement `get_available_memory_gb()` function
-  - Implement `allocate_memory_gb()` function
+  - Implement `get_total_memory_gb()` function
+  - Implement `calculate_memory_per_container_gb()` function
+  - Implement `apply_memory_limits_to_container()` function
+  - Implement `allocate_memory_for_containers()` function
+  - Implement `parse_memory_cli_options()` function
   - Add memory limits (--memory, --memory-swap) to container launch functions
   - Add CLI memory options parsing and validation
   - Use conservative memory calculation: (total_memory * (1 - headroom)) / max_parallel_jobs
-- [ ] **Refactor**: Optimize memory allocation algorithms and add memory usage monitoring
+- [x] **Refactor**: Optimize memory allocation algorithms and add memory usage monitoring
 
 **Acceptance Criteria**:
 - Can execute multiple test suites in parallel

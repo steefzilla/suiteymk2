@@ -988,3 +988,388 @@ is_resource_available() {
 
     return 0
 }
+
+# =============================================================================
+# Memory Resource Management Functions (3.3.5)
+# =============================================================================
+
+# Get available memory in GB
+# Usage: get_available_memory_gb
+# Returns: Available memory in GB as floating point
+# Behavior: Detects available system memory using various methods
+get_available_memory_gb() {
+    local available_kb=0
+    local detection_method="unknown"
+
+    # Try /proc/meminfo (Linux)
+    if [[ -f /proc/meminfo ]]; then
+        # Get available memory (includes buffers/cache)
+        available_kb=$(grep "^MemAvailable:" /proc/meminfo 2>/dev/null | awk '{print $2}' || echo "0")
+        if [[ "$available_kb" -gt 0 ]]; then
+            detection_method="proc_meminfo"
+        else
+            # Fallback to free memory
+            available_kb=$(grep "^MemFree:" /proc/meminfo 2>/dev/null | awk '{print $2}' || echo "0")
+            detection_method="proc_meminfo_free"
+        fi
+    fi
+
+    # Try sysctl (macOS/BSD)
+    if [[ "$available_kb" -eq 0 ]] && command -v sysctl >/dev/null 2>&1; then
+        # Get total memory and estimate available (rough approximation)
+        local total_kb
+        total_kb=$(sysctl -n hw.memsize 2>/dev/null | awk '{print $1 / 1024}' || echo "0")
+        if [[ "$total_kb" -gt 0 ]]; then
+            # Estimate available as 75% of total (rough heuristic)
+            available_kb=$(echo "$total_kb * 0.75" | bc -l 2>/dev/null | cut -d'.' -f1 || echo "$total_kb")
+            detection_method="sysctl_estimate"
+        fi
+    fi
+
+    # Fallback estimate
+    if [[ "$available_kb" -eq 0 ]]; then
+        # Assume 4GB as reasonable default
+        available_kb=4194304  # 4GB in KB
+        detection_method="fallback_estimate"
+    fi
+
+    # Convert KB to GB with 2 decimal places
+    local available_gb
+    if command -v bc >/dev/null 2>&1; then
+        available_gb=$(echo "scale=2; $available_kb / 1048576" | bc -l 2>/dev/null || echo "4.00")
+    else
+        # Fallback calculation
+        available_gb=$((available_kb / 1048576))
+        available_gb="${available_gb}.00"
+    fi
+
+    echo "available_memory_gb=$available_gb"
+    echo "available_memory_kb=$available_kb"
+    echo "detection_method=$detection_method"
+
+    return 0
+}
+
+# Get total memory in GB
+# Usage: get_total_memory_gb
+# Returns: Total system memory in GB
+# Behavior: Detects total system memory
+get_total_memory_gb() {
+    local total_kb=0
+    local detection_method="unknown"
+
+    # Try /proc/meminfo (Linux)
+    if [[ -f /proc/meminfo ]]; then
+        total_kb=$(grep "^MemTotal:" /proc/meminfo 2>/dev/null | awk '{print $2}' || echo "0")
+        if [[ "$total_kb" -gt 0 ]]; then
+            detection_method="proc_meminfo"
+        fi
+    fi
+
+    # Try sysctl (macOS/BSD)
+    if [[ "$total_kb" -eq 0 ]] && command -v sysctl >/dev/null 2>&1; then
+        total_kb=$(sysctl -n hw.memsize 2>/dev/null | awk '{print $1 / 1024}' || echo "0")
+        if [[ "$total_kb" -gt 0 ]]; then
+            detection_method="sysctl"
+        fi
+    fi
+
+    # Fallback estimate
+    if [[ "$total_kb" -eq 0 ]]; then
+        total_kb=4194304  # 4GB in KB
+        detection_method="fallback_estimate"
+    fi
+
+    # Convert KB to GB
+    local total_gb
+    if command -v bc >/dev/null 2>&1; then
+        total_gb=$(echo "scale=2; $total_kb / 1048576" | bc -l 2>/dev/null || echo "4.00")
+    else
+        total_gb=$((total_kb / 1048576))
+        total_gb="${total_gb}.00"
+    fi
+
+    echo "total_memory_gb=$total_gb"
+    echo "total_memory_kb=$total_kb"
+    echo "detection_method=$detection_method"
+
+    return 0
+}
+
+# Calculate memory per container in GB
+# Usage: calculate_memory_per_container_gb <total_memory_gb> <parallel_jobs> <memory_headroom>
+# Returns: Memory allocation details
+# Behavior: Uses conservative calculation: (total_memory * (1 - headroom)) / max_parallel_jobs
+calculate_memory_per_container_gb() {
+    local total_memory_gb="$1"
+    local parallel_jobs="$2"
+    local memory_headroom="$3"
+
+    # Validate inputs
+    if ! [[ "$total_memory_gb" =~ ^[0-9]*\.?[0-9]+$ ]] || [[ "$(echo "$total_memory_gb <= 0" | bc -l 2>/dev/null || echo "1")" = "1" ]]; then
+        echo "error_message=Invalid total_memory_gb: $total_memory_gb"
+        echo "memory_per_container_gb=0.1"
+        return 1
+    fi
+
+    if ! [[ "$parallel_jobs" =~ ^[0-9]+$ ]] || [[ "$parallel_jobs" -le 0 ]]; then
+        echo "error_message=Invalid parallel_jobs: $parallel_jobs"
+        echo "memory_per_container_gb=0.1"
+        return 1
+    fi
+
+    if ! [[ "$memory_headroom" =~ ^[0-9]*\.?[0-9]+$ ]] || [[ "$(echo "$memory_headroom < 0 || $memory_headroom >= 1" | bc -l 2>/dev/null || echo "1")" = "1" ]]; then
+        echo "error_message=Invalid memory_headroom: $memory_headroom (must be 0.0-0.99)"
+        echo "memory_per_container_gb=0.1"
+        return 1
+    fi
+
+    # Conservative calculation: (total_memory * (1 - headroom)) / max_parallel_jobs
+    local available_memory
+    local memory_per_container
+
+    if command -v bc >/dev/null 2>&1; then
+        available_memory=$(echo "scale=2; $total_memory_gb * (1 - $memory_headroom)" | bc -l 2>/dev/null)
+        memory_per_container=$(echo "scale=2; $available_memory / $parallel_jobs" | bc -l 2>/dev/null)
+    else
+        # Fallback calculation
+        available_memory=$((total_memory_gb * (100 - memory_headroom * 100) / 100))
+        memory_per_container=$((available_memory / parallel_jobs))
+    fi
+
+    # Ensure minimum allocation (100MB = 0.1GB)
+    local min_memory="0.1"
+    if [[ "$(echo "$memory_per_container < $min_memory" | bc -l 2>/dev/null || echo "0")" = "1" ]]; then
+        memory_per_container="$min_memory"
+        echo "warning_message=Memory per container limited to minimum: ${min_memory}GB"
+    fi
+
+    echo "memory_per_container_gb=$memory_per_container"
+    echo "total_memory_gb=$total_memory_gb"
+    echo "parallel_jobs=$parallel_jobs"
+    echo "memory_headroom=$memory_headroom"
+    echo "available_memory_after_headroom=$available_memory"
+
+    return 0
+}
+
+# Apply memory limits to Docker container command
+# Usage: apply_memory_limits_to_container <docker_cmd> <memory_limit_gb> [memory_swap_gb]
+# Returns: Modified Docker command with memory limits
+# Behavior: Adds --memory and --memory-swap flags to Docker command
+apply_memory_limits_to_container() {
+    local docker_cmd="$1"
+    local memory_limit_gb="$2"
+    local memory_swap_gb="$3"
+
+    # Validate memory limit
+    if [[ -z "$memory_limit_gb" ]] || [[ "$memory_limit_gb" == "0" ]]; then
+        # No memory limit specified
+        echo "$docker_cmd"
+        return 0
+    fi
+
+    # Validate numeric
+    if ! [[ "$memory_limit_gb" =~ ^[0-9]*\.?[0-9]+$ ]]; then
+        echo "Error: Invalid memory limit: $memory_limit_gb" >&2
+        echo "$docker_cmd"
+        return 1
+    fi
+
+    # Convert GB to bytes (1GB = 1073741824 bytes)
+    local memory_limit_bytes
+    if command -v bc >/dev/null 2>&1; then
+        memory_limit_bytes=$(echo "$memory_limit_gb * 1073741824" | bc -l 2>/dev/null | cut -d'.' -f1)
+    else
+        # Rough approximation
+        memory_limit_bytes=$((memory_limit_gb * 1073741824))
+    fi
+
+    # Add --memory flag
+    docker_cmd="$docker_cmd --memory=${memory_limit_bytes}"
+
+    # Add --memory-swap if specified
+    if [[ -n "$memory_swap_gb" ]] && [[ "$memory_swap_gb" != "0" ]]; then
+        if [[ "$memory_swap_gb" =~ ^[0-9]*\.?[0-9]+$ ]]; then
+            local memory_swap_bytes
+            if command -v bc >/dev/null 2>&1; then
+                memory_swap_bytes=$(echo "$memory_swap_gb * 1073741824" | bc -l 2>/dev/null | cut -d'.' -f1)
+            else
+                memory_swap_bytes=$((memory_swap_gb * 1073741824))
+            fi
+            docker_cmd="$docker_cmd --memory-swap=${memory_swap_bytes}"
+        fi
+    fi
+
+    echo "$docker_cmd"
+    return 0
+}
+
+# Allocate memory for containers
+# Usage: allocate_memory_for_containers <total_memory_gb> <num_containers> <memory_headroom>
+# Returns: Memory allocation results
+# Behavior: Validates and allocates memory for parallel container execution
+allocate_memory_for_containers() {
+    local total_memory_gb="$1"
+    local num_containers="$2"
+    local memory_headroom="$3"
+
+    # Validate inputs
+    if ! [[ "$total_memory_gb" =~ ^[0-9]*\.?[0-9]+$ ]] || [[ "$(echo "$total_memory_gb <= 0" | bc -l 2>/dev/null || echo "1")" = "1" ]]; then
+        echo "allocation_status=error"
+        echo "error_message=Invalid total memory: $total_memory_gb"
+        return 1
+    fi
+
+    if ! [[ "$num_containers" =~ ^[0-9]+$ ]] || [[ "$num_containers" -le 0 ]]; then
+        echo "allocation_status=error"
+        echo "error_message=Invalid number of containers: $num_containers"
+        return 1
+    fi
+
+    if ! [[ "$memory_headroom" =~ ^[0-9]*\.?[0-9]+$ ]] || [[ "$(echo "$memory_headroom < 0 || $memory_headroom >= 1" | bc -l 2>/dev/null || echo "1")" = "1" ]]; then
+        echo "allocation_status=error"
+        echo "error_message=Invalid memory headroom: $memory_headroom"
+        return 1
+    fi
+
+    # Calculate memory per container
+    local calc_result
+    calc_result=$(calculate_memory_per_container_gb "$total_memory_gb" "$num_containers" "$memory_headroom")
+
+    if [[ $? -ne 0 ]]; then
+        echo "allocation_status=error"
+        echo "$calc_result"
+        return 1
+    fi
+
+    # Extract memory per container
+    local memory_per_container
+    memory_per_container=$(echo "$calc_result" | grep "^memory_per_container_gb=" | cut -d'=' -f2)
+
+    # Check if allocation is reasonable
+    local warning_message=""
+    if [[ "$(echo "$memory_per_container < 0.2" | bc -l 2>/dev/null || echo "0")" = "1" ]]; then
+        warning_message="Low memory per container (${memory_per_container}GB) may cause performance issues"
+    fi
+
+    echo "allocation_status=success"
+    echo "total_containers=$num_containers"
+    echo "$calc_result"
+
+    if [[ -n "$warning_message" ]]; then
+        echo "warning_message=$warning_message"
+    fi
+
+    return 0
+}
+
+# Parse CLI memory options
+# Usage: parse_memory_cli_options [options...]
+# Returns: Parsed memory options in flat data format
+# Behavior: Parses --max-memory-per-container, --total-memory-limit, --memory-headroom options
+parse_memory_cli_options() {
+    local max_memory_per_container=""
+    local total_memory_limit=""
+    local memory_headroom=""
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --max-memory-per-container)
+                if [[ -n "$2" ]] && [[ "$2" != --* ]]; then
+                    max_memory_per_container="$2"
+                    shift 2
+                else
+                    echo "error_message=Missing value for --max-memory-per-container"
+                    echo "parse_status=error"
+                    return 1
+                fi
+                ;;
+            --total-memory-limit)
+                if [[ -n "$2" ]] && [[ "$2" != --* ]]; then
+                    total_memory_limit="$2"
+                    shift 2
+                else
+                    echo "error_message=Missing value for --total-memory-limit"
+                    echo "parse_status=error"
+                    return 1
+                fi
+                ;;
+            --memory-headroom)
+                if [[ -n "$2" ]] && [[ "$2" != --* ]]; then
+                    memory_headroom="$2"
+                    shift 2
+                else
+                    echo "error_message=Missing value for --memory-headroom"
+                    echo "parse_status=error"
+                    return 1
+                fi
+                ;;
+            *)
+                # Unknown option, skip
+                shift
+                ;;
+        esac
+    done
+
+    # Validate and set defaults
+    local errors=()
+
+    # Validate max memory per container
+    if [[ -n "$max_memory_per_container" ]]; then
+        if ! [[ "$max_memory_per_container" =~ ^[0-9]*\.?[0-9]+$ ]]; then
+            errors+=("Invalid max-memory-per-container: $max_memory_per_container")
+        elif [[ "$(echo "$max_memory_per_container <= 0" | bc -l 2>/dev/null || echo "1")" = "1" ]]; then
+            errors+=("max-memory-per-container must be greater than 0")
+        fi
+    else
+        # Default: use available memory calculation
+        local available_memory
+        available_memory=$(get_available_memory_gb 2>/dev/null | grep "^available_memory_gb=" | cut -d'=' -f2 || echo "1.0")
+        max_memory_per_container="$available_memory"
+    fi
+
+    # Validate total memory limit
+    if [[ -n "$total_memory_limit" ]]; then
+        if ! [[ "$total_memory_limit" =~ ^[0-9]*\.?[0-9]+$ ]]; then
+            errors+=("Invalid total-memory-limit: $total_memory_limit")
+        elif [[ "$(echo "$total_memory_limit <= 0" | bc -l 2>/dev/null || echo "1")" = "1" ]]; then
+            errors+=("total-memory-limit must be greater than 0")
+        fi
+    else
+        # Default: use total system memory
+        local total_memory
+        total_memory=$(get_total_memory_gb 2>/dev/null | grep "^total_memory_gb=" | cut -d'=' -f2 || echo "4.0")
+        total_memory_limit="$total_memory"
+    fi
+
+    # Validate memory headroom
+    if [[ -n "$memory_headroom" ]]; then
+        if ! [[ "$memory_headroom" =~ ^[0-9]*\.?[0-9]+$ ]]; then
+            errors+=("Invalid memory-headroom: $memory_headroom")
+        elif [[ "$(echo "$memory_headroom < 0 || $memory_headroom >= 1" | bc -l 2>/dev/null || echo "1")" = "1" ]]; then
+            errors+=("memory-headroom must be between 0.0 and 0.99")
+        fi
+    else
+        # Default headroom: 20%
+        memory_headroom="0.2"
+    fi
+
+    # Check for errors
+    if [[ ${#errors[@]} -gt 0 ]]; then
+        echo "parse_status=error"
+        for error in "${errors[@]}"; do
+            echo "error_message=$error"
+        done
+        return 1
+    fi
+
+    # Return parsed options
+    echo "parse_status=success"
+    echo "max_memory_per_container_gb=$max_memory_per_container"
+    echo "total_memory_limit_gb=$total_memory_limit"
+    echo "memory_headroom=$memory_headroom"
+
+    return 0
+}
