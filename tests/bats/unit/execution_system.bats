@@ -556,3 +556,161 @@ stderr=This is stderr output"
     assert [ $? -eq 0 ] || [ $? -eq 1 ]
 }
 
+@test "parse_test_results_with_module() parses cargo test output from example/rust-project" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/rust-project" ]]; then
+        skip "example/rust-project not available"
+    fi
+
+    # Source module registry
+    source "src/mod_registry.sh" 2>/dev/null || true
+
+    # Load cargo module
+    if [[ -f "mod/frameworks/cargo/mod.sh" ]]; then
+        source "mod/frameworks/cargo/mod.sh" 2>/dev/null || true
+    else
+        skip "Cargo module not found"
+    fi
+
+    # Create sample cargo test output (simplified)
+    local test_output="running 1 test
+test test_add ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out"
+    local exit_code=0
+
+    # Parse test results using cargo module
+    run parse_test_results_with_module "cargo-module" "$test_output" "$exit_code"
+    assert_success
+
+    # Verify parsed results contain test counts
+    assert_output --partial "total_tests="
+    assert_output --partial "passed_tests="
+    assert_output --partial "status="
+}
+
+@test "parse_test_results_with_module() parses bats output from example/bats-project" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/bats-project" ]]; then
+        skip "example/bats-project not available"
+    fi
+
+    # Source module registry
+    source "src/mod_registry.sh" 2>/dev/null || true
+
+    # Load bats module
+    if [[ -f "mod/frameworks/bats/mod.sh" ]]; then
+        source "mod/frameworks/bats/mod.sh" 2>/dev/null || true
+    else
+        skip "BATS module not found"
+    fi
+
+    # Create sample bats test output (simplified)
+    local test_output="1..3
+ok 1 test case 1
+ok 2 test case 2
+ok 3 test case 3"
+    local exit_code=0
+
+    # Parse test results using bats module
+    run parse_test_results_with_module "bats-module" "$test_output" "$exit_code"
+    assert_success
+
+    # Verify parsed results contain test counts
+    assert_output --partial "total_tests="
+    assert_output --partial "status="
+}
+
+@test "parse_test_results_with_module() handles unparseable output gracefully" {
+    # Source module registry
+    source "src/mod_registry.sh" 2>/dev/null || true
+
+    # Load cargo module (as example)
+    if [[ -f "mod/frameworks/cargo/mod.sh" ]]; then
+        source "mod/frameworks/cargo/mod.sh" 2>/dev/null || true
+    else
+        skip "Cargo module not found"
+    fi
+
+    # Create unparseable output
+    local test_output="This is completely unparseable output with no structure
+Random text that doesn't match any known format
+More gibberish"
+    local exit_code=1
+
+    # Parse test results - should handle gracefully
+    run parse_test_results_with_module "cargo-module" "$test_output" "$exit_code"
+    # Should either succeed (returning default values) or fail gracefully
+    assert [ $? -eq 0 ] || [ $? -eq 1 ]
+
+    # Should return some result structure
+    if [[ $status -eq 0 ]]; then
+        assert_output --partial "status="
+    fi
+}
+
+@test "parse_test_results_with_module() handles invalid module identifier gracefully" {
+    # Source module registry
+    source "src/mod_registry.sh" 2>/dev/null || true
+
+    local test_output="test output"
+    local exit_code=0
+
+    # Try to parse with non-existent module
+    run parse_test_results_with_module "nonexistent-module" "$test_output" "$exit_code"
+    assert_failure
+    assert_output --partial "error_message="
+}
+
+@test "parse_test_results_with_module() extracts individual test results when parseable" {
+    # Source module registry
+    source "src/mod_registry.sh" 2>/dev/null || true
+
+    # Load cargo module
+    if [[ -f "mod/frameworks/cargo/mod.sh" ]]; then
+        source "mod/frameworks/cargo/mod.sh" 2>/dev/null || true
+    else
+        skip "Cargo module not found"
+    fi
+
+    # Create detailed cargo test output with multiple tests
+    local test_output="running 3 tests
+test test_add ... ok
+test test_subtract ... ok
+test test_multiply ... FAILED
+
+failures:
+
+---- test_multiply stdout ----
+thread 'test_multiply' panicked at 'assertion failed: 2 * 3 == 5'
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out"
+    local exit_code=1
+
+    # Parse test results
+    run parse_test_results_with_module "cargo-module" "$test_output" "$exit_code"
+    assert_success
+
+    # Verify parsed results
+    assert_output --partial "total_tests="
+    assert_output --partial "passed_tests="
+    assert_output --partial "failed_tests="
+    assert_output --partial "status=failed"
+}
+

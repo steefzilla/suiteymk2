@@ -6,6 +6,7 @@
 
 # Source required dependencies
 source "src/data_access.sh" 2>/dev/null || true
+source "src/mod_registry.sh" 2>/dev/null || true
 
 # Launch a test container with pre-built test image
 # Usage: launch_test_container <container_config>
@@ -438,5 +439,111 @@ collect_test_results() {
     echo "status=success"
 
     return 0
+}
+
+# Parse test results using module's parse_test_results() method
+# Usage: parse_test_results_with_module <module_identifier> <test_output> <exit_code>
+# Returns: Parsed test results in flat data format
+# Behavior: Sources the module, calls its parse_test_results() method, and returns parsed results
+parse_test_results_with_module() {
+    local module_identifier="$1"
+    local test_output="$2"
+    local exit_code="$3"
+
+    # Validate required parameters
+    if [[ -z "$module_identifier" ]]; then
+        echo "Error: module_identifier is required" >&2
+        echo "status=error"
+        echo "error_message=module_identifier is required"
+        return 1
+    fi
+
+    if [[ -z "$test_output" ]] && [[ -z "$exit_code" ]]; then
+        echo "Error: test_output or exit_code is required" >&2
+        echo "status=error"
+        echo "error_message=test_output or exit_code is required"
+        return 1
+    fi
+
+    # Get module file path from identifier
+    # Module identifiers follow pattern: {name}-module
+    # Module files are at: mod/languages/{name}/mod.sh, mod/frameworks/{name}/mod.sh, or mod/tools/{name}/mod.sh
+    local module_file=""
+    local name="${module_identifier%-module}"
+
+    # Try framework modules first (most common for test parsing)
+    if [[ -f "mod/frameworks/${name}/mod.sh" ]]; then
+        module_file="mod/frameworks/${name}/mod.sh"
+    # Try language modules
+    elif [[ -f "mod/languages/${name}/mod.sh" ]]; then
+        module_file="mod/languages/${name}/mod.sh"
+    # Try tool modules
+    elif [[ -f "mod/tools/${name}/mod.sh" ]]; then
+        module_file="mod/tools/${name}/mod.sh"
+    fi
+
+    # If module file not found, try to get from registry
+    if [[ -z "$module_file" ]] || [[ ! -f "$module_file" ]]; then
+        # Check if module is registered
+        if declare -f get_module >/dev/null 2>&1; then
+            local module_name
+            module_name=$(get_module "$module_identifier" 2>/dev/null || echo "")
+            if [[ -n "$module_name" ]]; then
+                # Extract path from module name (format: mod/.../mod.sh)
+                module_file="$module_name"
+            fi
+        fi
+    fi
+
+    # If still not found, return error
+    if [[ -z "$module_file" ]] || [[ ! -f "$module_file" ]]; then
+        echo "Error: Module not found: $module_identifier" >&2
+        echo "status=error"
+        echo "error_message=Module not found: $module_identifier"
+        return 1
+    fi
+
+    # Clean up any existing module functions to avoid conflicts
+    for method in detect check_binaries discover_test_suites detect_build_requirements get_build_steps execute_test_suite parse_test_results get_metadata; do
+        unset -f "$method" 2>/dev/null || true
+    done
+
+    # Source the module
+    if ! source "$module_file" 2>/dev/null; then
+        echo "Error: Failed to load module: $module_file" >&2
+        echo "status=error"
+        echo "error_message=Failed to load module: $module_file"
+        return 1
+    fi
+
+    # Verify parse_test_results function exists
+    if ! declare -f parse_test_results >/dev/null 2>&1; then
+        echo "Error: Module does not implement parse_test_results() method" >&2
+        echo "status=error"
+        echo "error_message=Module does not implement parse_test_results() method"
+        return 1
+    fi
+
+    # Call module's parse_test_results() method
+    # Use subshell to avoid polluting current environment
+    local parsed_result
+    parsed_result=$(parse_test_results "$test_output" "$exit_code" 2>&1)
+    local parse_exit_code=$?
+
+    # Clean up module functions after use
+    for method in detect check_binaries discover_test_suites detect_build_requirements get_build_steps execute_test_suite parse_test_results get_metadata; do
+        unset -f "$method" 2>/dev/null || true
+    done
+
+    # Return parsed results
+    if [[ $parse_exit_code -eq 0 ]]; then
+        echo "$parsed_result"
+        return 0
+    else
+        # Even if parsing failed, return what we got (module may have returned partial results)
+        echo "$parsed_result"
+        echo "parse_status=error" >> /dev/stderr || true
+        return 1
+    fi
 }
 
