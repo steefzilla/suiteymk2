@@ -362,3 +362,81 @@ cleanup_test_containers() {
     return 0
 }
 
+# Collect test results and write to /tmp with unique filenames
+# Usage: collect_test_results <suite_id> <test_result_data>
+# Returns: Result file paths in flat data format
+# Behavior: Writes structured results to /tmp following Test Guidelines for Parallel Execution
+#           Uses unique filenames ($$ and $RANDOM) and atomic writes (temp file, then mv)
+collect_test_results() {
+    local suite_id="$1"
+    local test_result_data="$2"
+
+    # Validate required parameters
+    if [[ -z "$suite_id" ]]; then
+        echo "Error: suite_id is required" >&2
+        echo "result_file="
+        echo "output_file="
+        echo "error_message=suite_id is required"
+        return 1
+    fi
+
+    # Generate unique filenames following Test Guidelines for Parallel Execution
+    # Pattern: /tmp/suitey_test_result_<suite_id>_$$_$RANDOM
+    local result_filename="/tmp/suitey_test_result_${suite_id}_$$_$RANDOM"
+    local output_filename="/tmp/suitey_test_output_${suite_id}_$$_$RANDOM"
+
+    # Extract stdout and stderr from test result data
+    local stdout_content
+    stdout_content=$(echo "$test_result_data" | grep "^stdout=" | cut -d'=' -f2- || echo "")
+    local stderr_content
+    stderr_content=$(echo "$test_result_data" | grep "^stderr=" | cut -d'=' -f2- || echo "")
+
+    # Create temporary files for atomic writes
+    local result_temp_file
+    result_temp_file=$(mktemp -t suitey-result-temp-XXXXXX 2>/dev/null || echo "/tmp/suitey-result-temp-$$-$RANDOM")
+    local output_temp_file
+    output_temp_file=$(mktemp -t suitey-output-temp-XXXXXX 2>/dev/null || echo "/tmp/suitey-output-temp-$$-$RANDOM")
+
+    # Write structured result data to temp file
+    echo "$test_result_data" > "$result_temp_file"
+
+    # Write output data (stdout and stderr) to temp file
+    {
+        if [[ -n "$stdout_content" ]]; then
+            echo "=== STDOUT ==="
+            echo "$stdout_content"
+        fi
+        if [[ -n "$stderr_content" ]]; then
+            echo "=== STDERR ==="
+            echo "$stderr_content"
+        fi
+    } > "$output_temp_file"
+
+    # Atomic write: move temp files to final location
+    if ! mv "$result_temp_file" "$result_filename" 2>/dev/null; then
+        rm -f "$result_temp_file" "$output_temp_file" 2>/dev/null || true
+        echo "Error: Failed to write result file" >&2
+        echo "result_file="
+        echo "output_file="
+        echo "error_message=Failed to write result file"
+        return 1
+    fi
+
+    if ! mv "$output_temp_file" "$output_filename" 2>/dev/null; then
+        rm -f "$result_filename" "$output_temp_file" 2>/dev/null || true
+        echo "Error: Failed to write output file" >&2
+        echo "result_file=$result_filename"
+        echo "output_file="
+        echo "error_message=Failed to write output file"
+        return 1
+    fi
+
+    # Return file paths in flat data format
+    echo "result_file=$result_filename"
+    echo "output_file=$output_filename"
+    echo "suite_id=$suite_id"
+    echo "status=success"
+
+    return 0
+}
+

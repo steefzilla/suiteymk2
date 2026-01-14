@@ -846,14 +846,20 @@ This requirement applies to all phases and ensures code quality and test coverag
 - [x] **Refactor**: Improve container management
 
 **3.2.2 Result Collection**
-*Collect test results (exit codes, stdout/stderr, duration) from containers and write structured results to /tmp.*
-- [ ] **Red**: Write tests for result collection
+*Collect test results (exit codes, stdout/stderr, duration) from containers and write structured results to /tmp following Test Guidelines for Parallel Execution (see spec/TESTING.md).*
+- [x] **Red**: Write tests for result collection
   - Test: Collect exit code from test container using `./example/rust-project/`
   - Test: Collect test output (stdout/stderr) from `./example/rust-project/`
   - Test: Calculate execution duration for `./example/rust-project/`
-  - Test: Write results to `/tmp` in structured format
-- [ ] **Green**: Implement result collection
-- [ ] **Refactor**: Optimize result storage
+  - Test: Write results to `/tmp` in structured format with unique filenames (using `$$` and `$RANDOM` per Test Guidelines)
+  - Test: Verify result files use unique names to prevent race conditions in parallel execution
+  - Test: Verify atomic writes (write to temp file, then `mv` to final location)
+- [x] **Green**: Implement result collection
+  - Write result files to `/tmp` with unique names: `/tmp/suitey_test_result_<suite_id>_$$_$RANDOM`
+  - Write output files to `/tmp` with unique names: `/tmp/suitey_test_output_<suite_id>_$$_$RANDOM`
+  - Use atomic writes: write to temporary file first, then `mv` to final location
+  - Follow Test Guidelines for Parallel Execution (isolation, unique resource names, no shared state)
+- [x] **Refactor**: Optimize result storage
 
 **3.2.3 Result Parsing**
 *Parse test output to extract test counts and individual test results using module parse_test_results() methods.*
@@ -907,12 +913,16 @@ This requirement applies to all phases and ensures code quality and test coverag
 - [ ] **Refactor**: Improve parallel execution management
 
 **3.3.2 Result Monitoring**
-*Poll result files in /tmp as tests complete, update status in real-time, and handle test failures gracefully.*
+*Poll result files in /tmp as tests complete (using unique filenames per Test Guidelines), update status in real-time, and handle test failures gracefully.*
 - [ ] **Red**: Write tests for result monitoring
-  - Test: Poll result files in `/tmp` as tests complete
+  - Test: Poll result files in `/tmp` as tests complete (handle unique filename pattern: `suitey_test_result_<suite_id>_$$_$RANDOM`)
   - Test: Update status as tests finish
   - Test: Handle test failures gracefully
+  - Test: Handle multiple result files with same suite_id but different unique suffixes
 - [ ] **Green**: Implement result monitoring
+  - Poll `/tmp` for result files matching pattern `suitey_test_result_*`
+  - Track which result files have been processed to avoid re-reading
+  - Handle atomic writes (only read files that are fully written)
 - [ ] **Refactor**: Optimize polling, reduce overhead
 
 **3.3.3 Signal Handling**
@@ -992,12 +1002,16 @@ This requirement applies to all phases and ensures code quality and test coverag
 - [ ] **Refactor**: Improve display formatting, optimize updates
 
 **4.2.2 Real-Time Updates**
-*Poll /tmp for result files, update dashboard when new results are available, and refresh display without flickering.*
+*Poll /tmp for result files (using unique filename pattern per Test Guidelines), update dashboard when new results are available, and refresh display without flickering.*
 - [ ] **Red**: Write tests for real-time updates
-  - Test: Poll `/tmp` for result files
+  - Test: Poll `/tmp` for result files (handle unique filename pattern: `suitey_test_result_<suite_id>_$$_$RANDOM`)
   - Test: Update dashboard when new results available
   - Test: Refresh display without flickering
+  - Test: Handle atomic writes (only process fully written files)
 - [ ] **Green**: Implement real-time update logic
+  - Poll `/tmp` for result files matching pattern `suitey_test_result_*`
+  - Track processed files to avoid re-reading
+  - Handle atomic writes correctly
 - [ ] **Refactor**: Optimize polling frequency, reduce CPU usage
 
 **4.2.3 Final Summary**
