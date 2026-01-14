@@ -29,10 +29,19 @@ setup() {
     # Reset global state
     ACTIVE_CONTAINERS=""
     PROCESSED_RESULT_FILES=""
-
-    # Clean up any existing test files
-    rm -f /tmp/suitey_test_result_* /tmp/suitey_test_output_* 2>/dev/null || true
-    rm -f /tmp/suitey_resource_* 2>/dev/null || true
+    
+    # Create a unique identifier for this test to avoid race conditions with parallel tests
+    # Use BATS_TEST_NUMBER which is unique per test in the file
+    TEST_UNIQUE_ID="restest_${BATS_TEST_NUMBER}_$$_${RANDOM}"
+    
+    # Set unique pool state file for this test
+    export SUITEY_POOL_STATE_FILE="/tmp/suitey_resource_pool_${TEST_UNIQUE_ID}"
+    
+    # Reset pool state
+    RESOURCE_POOL_CAPACITY=0
+    RESOURCE_POOL_AVAILABLE=0
+    RESOURCE_POOL_IN_USE=0
+    RESOURCE_POOL_INITIALIZED=""
 }
 
 teardown() {
@@ -53,9 +62,18 @@ teardown() {
     done
     TEST_IMAGES=()
 
-    # Clean up any remaining test files
-    rm -f /tmp/suitey_test_result_* /tmp/suitey_test_output_* 2>/dev/null || true
-    rm -f /tmp/suitey_resource_* 2>/dev/null || true
+    # Only clean up files belonging to THIS test (using TEST_UNIQUE_ID)
+    if [[ -n "$TEST_UNIQUE_ID" ]]; then
+        rm -f /tmp/*"${TEST_UNIQUE_ID}"* 2>/dev/null || true
+    fi
+    
+    # Clean up pool state file
+    if [[ -n "$SUITEY_POOL_STATE_FILE" ]]; then
+        rm -f "$SUITEY_POOL_STATE_FILE" 2>/dev/null || true
+    fi
+    
+    unset SUITEY_POOL_STATE_FILE
+    unset TEST_UNIQUE_ID
 }
 
 # =============================================================================
@@ -141,8 +159,8 @@ teardown() {
 }
 
 @test "resource_pool_acquire() acquires resources when available" {
-    # Initialize pool first
-    resource_pool_init 4 >/dev/null 2>&1 || true
+    # Initialize pool first (not with run, to preserve state)
+    resource_pool_init 4 >/dev/null 2>&1
 
     run resource_pool_acquire 1
     assert_success
@@ -153,11 +171,11 @@ teardown() {
 }
 
 @test "resource_pool_acquire() blocks when resources exhausted" {
-    # Initialize pool with 1 slot
-    resource_pool_init 1 >/dev/null 2>&1 || true
+    # Initialize pool with 1 slot (not with run, to preserve state)
+    resource_pool_init 1 >/dev/null 2>&1
 
-    # Acquire the only slot
-    resource_pool_acquire 1 >/dev/null 2>&1 || true
+    # Acquire the only slot (not with run, to preserve state)
+    resource_pool_acquire 1 >/dev/null 2>&1
 
     # Try to acquire another (should fail with wait indication)
     run resource_pool_acquire 1 "no_wait"
@@ -167,11 +185,11 @@ teardown() {
 }
 
 @test "resource_pool_release() releases resources back to pool" {
-    # Initialize pool
-    resource_pool_init 4 >/dev/null 2>&1 || true
+    # Initialize pool (not with run, to preserve state)
+    resource_pool_init 4 >/dev/null 2>&1
 
-    # Acquire resources
-    resource_pool_acquire 2 >/dev/null 2>&1 || true
+    # Acquire resources (not with run, to preserve state)
+    resource_pool_acquire 2 >/dev/null 2>&1
 
     # Release resources
     run resource_pool_release 2
@@ -183,11 +201,11 @@ teardown() {
 }
 
 @test "resource_pool_status() returns current pool state" {
-    # Initialize pool
-    resource_pool_init 4 >/dev/null 2>&1 || true
+    # Initialize pool (not with run, to preserve state)
+    resource_pool_init 4 >/dev/null 2>&1
 
-    # Acquire some resources
-    resource_pool_acquire 2 >/dev/null 2>&1 || true
+    # Acquire some resources (not with run, to preserve state)
+    resource_pool_acquire 2 >/dev/null 2>&1
 
     run resource_pool_status
     assert_success
@@ -278,11 +296,14 @@ teardown() {
         skip "Docker daemon is not running"
     fi
 
+    # Use unique names for this test
+    local unique_suffix="${TEST_UNIQUE_ID}"
+
     # Create test containers with suitey naming pattern
     local container1
-    container1=$(docker run -d --name "suitey-test-cleanup-$$-1" alpine:latest sleep 300 2>/dev/null | tr -d '\n')
+    container1=$(docker run -d --name "suitey-test-cleanup-${unique_suffix}-1" alpine:latest sleep 300 2>/dev/null | tr -d '\n')
     local container2
-    container2=$(docker run -d --name "suitey-test-cleanup-$$-2" alpine:latest sleep 300 2>/dev/null | tr -d '\n')
+    container2=$(docker run -d --name "suitey-test-cleanup-${unique_suffix}-2" alpine:latest sleep 300 2>/dev/null | tr -d '\n')
 
     if [[ -z "$container1" ]] || [[ -z "$container2" ]]; then
         skip "Failed to create test containers"
@@ -299,7 +320,7 @@ teardown() {
     
     # Containers should be removed
     local containers_remaining
-    containers_remaining=$(docker ps -a --filter "name=suitey-test-cleanup-$$" --format "{{.ID}}" | wc -l)
+    containers_remaining=$(docker ps -a --filter "name=suitey-test-cleanup-${unique_suffix}" --format "{{.ID}}" | wc -l)
     assert [ "$containers_remaining" -eq 0 ]
 }
 
@@ -338,8 +359,8 @@ teardown() {
 # -----------------------------------------------------------------------------
 
 @test "cleanup_temp_files() removes result files from /tmp" {
-    # Create test result files
-    local suite_id="cleanup-test"
+    # Create test result files with unique names for this test
+    local suite_id="cleanup-${TEST_UNIQUE_ID}"
     local pid=$$
     local random=$RANDOM
 
@@ -365,27 +386,27 @@ teardown() {
 }
 
 @test "cleanup_temp_files() removes all suitey temporary files" {
-    # Create various suitey temp files
-    echo "test1" > "/tmp/suitey_test_result_suite1_$$_$RANDOM"
-    echo "test2" > "/tmp/suitey_test_output_suite2_$$_$RANDOM"
-    echo "test3" > "/tmp/suitey_resource_pool_$$"
-    echo "test4" > "/tmp/suitey_build_temp_$$"
+    # Create various suitey temp files with unique names for this test
+    local unique="${TEST_UNIQUE_ID}"
+    echo "test1" > "/tmp/suitey_test_result_${unique}_1"
+    echo "test2" > "/tmp/suitey_test_output_${unique}_2"
+    echo "test3" > "/tmp/suitey_resource_${unique}_3"
+    echo "test4" > "/tmp/suitey_build_${unique}_4"
 
     run cleanup_temp_files
     assert_success
 
-    # All suitey files should be removed
-    local remaining_files
-    remaining_files=$(find /tmp -name "suitey_*" -user "$(id -u)" 2>/dev/null | wc -l)
-    assert [ "$remaining_files" -eq 0 ]
+    # The files we created should be removed
+    assert [ ! -f "/tmp/suitey_test_result_${unique}_1" ]
+    assert [ ! -f "/tmp/suitey_test_output_${unique}_2" ]
+    assert [ ! -f "/tmp/suitey_resource_${unique}_3" ]
+    assert [ ! -f "/tmp/suitey_build_${unique}_4" ]
 
     assert_output --partial "temp_cleanup_completed=true"
 }
 
 @test "cleanup_temp_files() handles empty /tmp gracefully" {
-    # Ensure no suitey files exist
-    rm -f /tmp/suitey_* 2>/dev/null || true
-
+    # Don't clean up other tests' files - just test with no files created
     run cleanup_temp_files
     assert_success
 
@@ -394,10 +415,11 @@ teardown() {
 }
 
 @test "cleanup_temp_files() reports number of files removed" {
-    # Create test files
-    echo "test1" > "/tmp/suitey_cleanup_count_1_$$"
-    echo "test2" > "/tmp/suitey_cleanup_count_2_$$"
-    echo "test3" > "/tmp/suitey_cleanup_count_3_$$"
+    # Create test files with unique names
+    local unique="${TEST_UNIQUE_ID}"
+    echo "test1" > "/tmp/suitey_cleanup_count_${unique}_1"
+    echo "test2" > "/tmp/suitey_cleanup_count_${unique}_2"
+    echo "test3" > "/tmp/suitey_cleanup_count_${unique}_3"
 
     run cleanup_temp_files
     assert_success
@@ -405,19 +427,20 @@ teardown() {
     # Should report files removed
     assert_output --partial "temp_files_removed="
     
-    # Extract count
+    # Extract count - should be at least 3 (our files)
     local files_removed
     files_removed=$(echo "$output" | grep "^temp_files_removed=" | cut -d'=' -f2)
     assert [ "$files_removed" -ge 3 ]
 }
 
 @test "cleanup_temp_files() does not remove non-suitey files" {
-    # Create a non-suitey file
-    local other_file="/tmp/not_suitey_file_$$"
+    # Create a non-suitey file with unique name
+    local unique="${TEST_UNIQUE_ID}"
+    local other_file="/tmp/not_suitey_file_${unique}"
     echo "other content" > "$other_file"
 
     # Create a suitey file
-    local suitey_file="/tmp/suitey_should_be_removed_$$"
+    local suitey_file="/tmp/suitey_should_be_removed_${unique}"
     echo "suitey content" > "$suitey_file"
 
     run cleanup_temp_files
@@ -438,14 +461,15 @@ teardown() {
 # -----------------------------------------------------------------------------
 
 @test "cleanup_on_completion() cleans both containers and temp files" {
-    # Create temp files
-    echo "test" > "/tmp/suitey_completion_test_$$"
+    # Create temp files with unique name
+    local unique="${TEST_UNIQUE_ID}"
+    echo "test" > "/tmp/suitey_completion_test_${unique}"
 
     run cleanup_on_completion
     assert_success
 
     # Should clean up temp files
-    assert [ ! -f "/tmp/suitey_completion_test_$$" ]
+    assert [ ! -f "/tmp/suitey_completion_test_${unique}" ]
 
     # Should report completion
     assert_output --partial "cleanup_status=complete"
@@ -454,23 +478,16 @@ teardown() {
 }
 
 @test "cleanup_on_completion() releases resource pool" {
-    # Use a unique pool state file for this test to avoid parallel test interference
-    local unique_id="${BATS_TEST_NUMBER}_$$_$RANDOM"
-    
-    # Override the pool state file path for this test
-    export SUITEY_POOL_STATE_FILE="/tmp/suitey_resource_pool_test_${unique_id}"
-    
     # Initialize resource pool (creates state file)
-    resource_pool_init 4 >/dev/null 2>&1 || true
+    resource_pool_init 4 >/dev/null 2>&1
 
     # Acquire some resources
-    resource_pool_acquire 2 >/dev/null 2>&1 || true
+    resource_pool_acquire 2 >/dev/null 2>&1
 
     # Verify pool state file exists
-    local pool_state_file="/tmp/suitey_resource_pool_$$"
-    
-    # Skip file check - the pool state uses $$ which works within same process
-    # Call cleanup directly (not with run, to preserve $$)
+    assert [ -f "$SUITEY_POOL_STATE_FILE" ]
+
+    # Call cleanup directly (not with run, to preserve environment)
     local output
     output=$(cleanup_on_completion 2>&1)
     local status=$?
@@ -478,13 +495,9 @@ teardown() {
     # Should succeed
     assert [ "$status" -eq 0 ]
 
-    # Output should indicate pool was released or cleanup completed
+    # Output should indicate cleanup completed
     echo "$output" | grep -q "cleanup_status=complete"
     assert [ $? -eq 0 ]
-    
-    # Cleanup our unique file if it exists
-    rm -f "$SUITEY_POOL_STATE_FILE" 2>/dev/null || true
-    unset SUITEY_POOL_STATE_FILE
 }
 
 @test "get_active_container_count() returns number of tracked containers" {
@@ -509,16 +522,16 @@ teardown() {
 }
 
 @test "is_resource_available() checks if resources can be acquired" {
-    # Initialize pool with 2 slots
-    resource_pool_init 2 >/dev/null 2>&1 || true
+    # Initialize pool with 2 slots (not with run, to preserve state)
+    resource_pool_init 2 >/dev/null 2>&1
 
     # Initially should have resources
     run is_resource_available
     assert_success
     assert_output --partial "available=true"
 
-    # Acquire all resources
-    resource_pool_acquire 2 >/dev/null 2>&1 || true
+    # Acquire all resources (not with run, to preserve state)
+    resource_pool_acquire 2 >/dev/null 2>&1
 
     # Now should not have resources
     run is_resource_available
@@ -540,10 +553,8 @@ teardown() {
         skip "Docker daemon is not running"
     fi
 
-    # Initialize resource pool
-    run resource_pool_init
-    assert_success
-    assert_output --partial "pool_status=initialized"
+    # Initialize resource pool (not with run, to preserve state)
+    resource_pool_init >/dev/null 2>&1
 
     # Get initial status
     run resource_pool_status
@@ -579,4 +590,3 @@ teardown() {
     # Max containers should not exceed available cores
     assert [ "$max_containers" -le "$available_cores" ]
 }
-

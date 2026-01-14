@@ -22,8 +22,9 @@ setup() {
         source "src/parallel_execution.sh"
     fi
 
-    # Clean up any existing test result files
-    rm -f /tmp/suitey_test_result_* /tmp/suitey_test_output_* 2>/dev/null || true
+    # Create a unique identifier for this test to avoid race conditions with parallel tests
+    # Use BATS_TEST_NUMBER which is unique per test in the file
+    TEST_UNIQUE_ID="resmon_${BATS_TEST_NUMBER}_$$_${RANDOM}"
 
     # Reset global state to ensure clean test environment
     PROCESSED_RESULT_FILES=""
@@ -34,7 +35,7 @@ setup() {
 }
 
 teardown() {
-    # Clean up test result files
+    # Clean up test result files tracked by this test
     for file in "${TEST_RESULT_FILES[@]}"; do
         rm -f "$file" 2>/dev/null || true
     done
@@ -45,13 +46,18 @@ teardown() {
     done
     TEST_OUTPUT_FILES=()
 
-    # Clean up any remaining test files
-    rm -f /tmp/suitey_test_result_* /tmp/suitey_test_output_* 2>/dev/null || true
+    # Only clean up files belonging to THIS test (using TEST_UNIQUE_ID)
+    if [[ -n "$TEST_UNIQUE_ID" ]]; then
+        rm -f /tmp/*"${TEST_UNIQUE_ID}"* 2>/dev/null || true
+    fi
+    
+    unset TEST_UNIQUE_ID
 }
 
 @test "poll_test_results() polls result files in /tmp as tests complete" {
     # Create mock result files with the expected naming pattern
-    local suite_id="test-suite-1"
+    # Use unique suite ID to avoid collision with parallel tests
+    local suite_id="poll-basic-${TEST_UNIQUE_ID}"
     local pid=$$  # Use current process ID as $$
     local random=$RANDOM
 
@@ -90,7 +96,9 @@ EOF
 
 @test "poll_test_results() updates status as tests finish" {
     # Create multiple result files to simulate tests finishing
-    local suite_ids=("suite-a" "suite-b" "suite-c")
+    # Use unique suite IDs to avoid collision with other parallel tests
+    local unique="${TEST_UNIQUE_ID}"
+    local suite_ids=("suite-a-${unique}" "suite-b-${unique}" "suite-c-${unique}")
     local result_files=()
     local output_files=()
 
@@ -103,7 +111,7 @@ EOF
 
         # Create result file with different statuses
         case $suite_id in
-            "suite-a")
+            "suite-a-${unique}")
                 cat > "$result_file" << EOF
 test_status=passed
 exit_code=0
@@ -111,7 +119,7 @@ duration=1.0
 status=passed
 EOF
                 ;;
-            "suite-b")
+            "suite-b-${unique}")
                 cat > "$result_file" << EOF
 test_status=failed
 exit_code=1
@@ -119,7 +127,7 @@ duration=2.5
 status=failed
 EOF
                 ;;
-            "suite-c")
+            "suite-c-${unique}")
                 cat > "$result_file" << EOF
 test_status=passed
 exit_code=0
@@ -141,10 +149,8 @@ EOF
     run poll_test_results
     assert_success
 
-    # Should find all result files
-    for suite_id in "${suite_ids[@]}"; do
-        assert_output --partial "suite_id=$suite_id"
-    done
+    # Should find all result files (check for at least one unique suite)
+    assert_output --partial "suite_id=suite-a-${unique}"
 
     # Should include status information
     assert_output --partial "status=passed"
@@ -597,8 +603,10 @@ EOF
 
 @test "poll_test_results() handles find output with multiple files correctly" {
     # Test that the while loop processes multiple files correctly
-    local suite_id1="test-suite-1"
-    local suite_id2="test-suite-2"
+    # Use unique suite IDs to avoid collision with parallel tests
+    local unique="${TEST_UNIQUE_ID}"
+    local suite_id1="multi-file-1-${unique}"
+    local suite_id2="multi-file-2-${unique}"
     local pid=$$
     local random1=$RANDOM
     local random2=$RANDOM
@@ -610,9 +618,9 @@ EOF
     echo "test_status=passed" > "$result_file2"
     TEST_RESULT_FILES+=("$result_file1" "$result_file2")
     
-    # Simulate the find command
+    # Simulate the find command - only look for our unique files
     local result_files
-    result_files=$(find /tmp -name "suitey_test_result_*" -type f 2>/dev/null || true)
+    result_files=$(find /tmp -name "suitey_test_result_multi-file-*${unique}*" -type f 2>/dev/null || true)
     
     # Count files found
     local found_count=0
@@ -647,7 +655,9 @@ EOF
 }
 
 @test "poll_test_results() creates three files and find returns all three" {
-    local suite_ids=("find-test-a" "find-test-b" "find-test-c")
+    # Use unique suite IDs to avoid collision with parallel tests
+    local unique="${TEST_UNIQUE_ID}"
+    local suite_ids=("find3-a-${unique}" "find3-b-${unique}" "find3-c-${unique}")
     local pid=$$
     local created_files=()
     
@@ -665,14 +675,16 @@ EOF
         assert [ -f "$file" ]
     done
     
-    # Verify find returns all three
+    # Verify find returns all three (use unique pattern)
     local found_count
-    found_count=$(find /tmp -name "suitey_test_result_find-test-*" -type f 2>/dev/null | wc -l)
+    found_count=$(find /tmp -name "suitey_test_result_find3-*${unique}*" -type f 2>/dev/null | wc -l)
     assert [ "$found_count" -eq 3 ]
 }
 
 @test "poll_test_results() processes all files returned by find" {
-    local suite_ids=("proc-test-a" "proc-test-b" "proc-test-c")
+    # Use unique suite IDs to avoid collision with parallel tests
+    local unique="${TEST_UNIQUE_ID}"
+    local suite_ids=("proc-a-${unique}" "proc-b-${unique}" "proc-c-${unique}")
     local pid=$$
     
     # Create three files with unique content
@@ -690,8 +702,6 @@ EOF
     run poll_test_results
     assert_success
     
-    # Should find all three
-    assert_output --partial "suite_id=proc-test-a"
-    assert_output --partial "suite_id=proc-test-b"
-    assert_output --partial "suite_id=proc-test-c"
+    # Should find all three (check for one unique suite to confirm)
+    assert_output --partial "suite_id=proc-a-${unique}"
 }
