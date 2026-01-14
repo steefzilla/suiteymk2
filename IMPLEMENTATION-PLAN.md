@@ -957,13 +957,13 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **3.3.3 Signal Handling**
 *Handle SIGINT (Ctrl+C) gracefully: terminate containers on first signal, force kill on second signal, and clean up on exit.*
-- [ ] **Red**: Write tests for signal handling
+- [x] **Red**: Write tests for signal handling
   - Test: Handle SIGINT (first Ctrl+C) gracefully
   - Test: Terminate all containers on SIGINT
   - Test: Handle second SIGINT (force kill)
   - Test: Clean up containers on exit
-- [ ] **Green**: Implement signal handling
-- [ ] **Refactor**: Improve cleanup logic
+- [x] **Green**: Implement signal handling
+- [x] **Refactor**: Improve cleanup logic
 
 **3.3.4 Resource Management**
 *Limit concurrent containers by CPU count, clean up containers after completion, and remove temporary files from /tmp.*

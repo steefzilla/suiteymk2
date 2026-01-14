@@ -38,3 +38,4 @@ load 'test_helper/bats-assert/load'
     [ "${test_array[2]}" = "test" ]
 }
 
+
