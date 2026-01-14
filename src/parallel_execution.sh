@@ -233,3 +233,94 @@ container_name=$container_name"
     echo "$result"
     return 0
 }
+
+# Global variable to track processed result files
+PROCESSED_RESULT_FILES=""
+
+# Poll result files in /tmp as tests complete
+# Usage: poll_test_results
+# Returns: Flat data format with completed test results
+# Looks for files matching pattern: suitey_test_result_*
+# Tracks processed files to avoid re-reading
+poll_test_results() {
+    local results_found=0
+    local all_results=""
+
+    # Find all result files matching the pattern
+    local result_files
+    result_files=$(find /tmp -name "suitey_test_result_*" -type f 2>/dev/null || true)
+
+    # Process each result file
+    while IFS= read -r result_file; do
+        [[ -z "$result_file" ]] && continue
+
+        # Extract suite_id and unique identifiers from filename
+        local filename
+        filename=$(basename "$result_file")
+        local suite_id=""
+        local pid_part=""
+        local random_part=""
+
+        # Parse filename: suitey_test_result_<suite_id>_<pid>_<random>
+        if [[ "$filename" =~ suitey_test_result_(.+)_(.+)_(.+)$ ]]; then
+            suite_id="${BASH_REMATCH[1]}"
+            pid_part="${BASH_REMATCH[2]}"
+            random_part="${BASH_REMATCH[3]}"
+        else
+            # Skip files that don't match expected pattern
+            continue
+        fi
+
+        # Check if we've already processed this file
+        local file_key="$suite_id:$pid_part:$random_part"
+        if [[ "$PROCESSED_RESULT_FILES" == *"$file_key"* ]]; then
+            continue
+        fi
+
+        # Check if file is fully written (atomic write check)
+        # For now, assume file is complete if it exists and has content
+        if [[ ! -s "$result_file" ]]; then
+            # File is empty, skip for now
+            continue
+        fi
+
+        # Read result file content
+        local result_content=""
+        if result_content=$(cat "$result_file" 2>/dev/null); then
+            # Mark file as processed
+            PROCESSED_RESULT_FILES="$PROCESSED_RESULT_FILES|$file_key"
+
+            # Find corresponding output file
+            local output_file="/tmp/suitey_test_output_${suite_id}_${pid_part}_${random_part}"
+
+            # Build result output
+            local result_output="suite_id=$suite_id
+result_file=$result_file
+output_file=$output_file
+$result_content"
+
+            # Append to all results
+            if [[ -z "$all_results" ]]; then
+                all_results="$result_output"
+            else
+                all_results="$all_results
+---
+$result_output"
+            fi
+
+            ((results_found++))
+        fi
+    done <<< "$result_files"
+
+    # Return results
+    if [[ $results_found -eq 0 ]]; then
+        echo "results_found=0"
+        echo "status=no_results"
+    else
+        echo "results_found=$results_found"
+        echo "$all_results"
+        echo "status=results_found"
+    fi
+
+    return 0
+}

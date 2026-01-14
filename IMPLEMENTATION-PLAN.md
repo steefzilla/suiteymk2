@@ -944,16 +944,16 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **3.3.2 Result Monitoring**
 *Poll result files in /tmp as tests complete (using unique filenames per Test Guidelines), update status in real-time, and handle test failures gracefully.*
-- [ ] **Red**: Write tests for result monitoring
+- [x] **Red**: Write tests for result monitoring
   - Test: Poll result files in `/tmp` as tests complete (handle unique filename pattern: `suitey_test_result_<suite_id>_$$_$RANDOM`)
   - Test: Update status as tests finish
   - Test: Handle test failures gracefully
   - Test: Handle multiple result files with same suite_id but different unique suffixes
-- [ ] **Green**: Implement result monitoring
+- [x] **Green**: Implement result monitoring
   - Poll `/tmp` for result files matching pattern `suitey_test_result_*`
   - Track which result files have been processed to avoid re-reading
   - Handle atomic writes (only read files that are fully written)
-- [ ] **Refactor**: Optimize polling, reduce overhead
+- [x] **Refactor**: Optimize polling, reduce overhead
 
 **3.3.3 Signal Handling**
 *Handle SIGINT (Ctrl+C) gracefully: terminate containers on first signal, force kill on second signal, and clean up on exit.*
