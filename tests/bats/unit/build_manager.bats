@@ -740,3 +740,214 @@ container_name=suitey-test-parallel-$$"
     # (We can't easily verify this without parsing cargo output, but the function should work)
 }
 
+@test "generate_test_image_dockerfile() generates Dockerfile for test image using example/rust-project" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if [[ ! -d "example/rust-project" ]]; then
+        skip "example/rust-project not available"
+    fi
+
+    # Create test configuration
+    local base_image="rust:1.70-slim"
+    local artifact_dir="/tmp/build-artifacts"
+    local project_root="example/rust-project"
+    local test_image_config="base_image=$base_image
+artifact_dir=$artifact_dir
+project_root=$project_root
+framework=rust"
+
+    run generate_test_image_dockerfile "$test_image_config"
+    assert_success
+
+    # Verify Dockerfile contains required sections
+    assert_output --partial "FROM $base_image"
+    assert_output --partial "COPY"
+    assert_output --partial "WORKDIR"
+
+    # Verify Dockerfile is valid (can be parsed)
+    local dockerfile_content="$output"
+    assert [ -n "$dockerfile_content" ]
+}
+
+@test "build_test_image() builds Docker image with artifacts from example/rust-project" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/rust-project" ]]; then
+        skip "example/rust-project not available"
+    fi
+
+    # Create temporary directory for artifacts
+    local artifact_dir
+    artifact_dir=$(mktemp -d -t suitey-test-artifacts-XXXXXX)
+    
+    # Create a dummy artifact file
+    mkdir -p "$artifact_dir/target/debug"
+    echo "dummy binary" > "$artifact_dir/target/debug/suitey-rust-example"
+
+    # Create test image configuration
+    local base_image="rust:1.70-slim"
+    local project_root="example/rust-project"
+    local image_tag="suitey-test-rust-$$"
+    local test_image_config="base_image=$base_image
+artifact_dir=$artifact_dir
+project_root=$project_root
+framework=rust
+image_tag=$image_tag"
+
+    run build_test_image "$test_image_config"
+    assert_success
+
+    # Verify image was created
+    assert_output --partial "image_id="
+    assert_output --partial "image_tag=$image_tag"
+    assert_output --partial "build_status=success"
+
+    # Extract image ID for cleanup
+    local image_id
+    image_id=$(echo "$output" | grep "^image_id=" | cut -d'=' -f2)
+    if [[ -n "$image_id" ]]; then
+        # Clean up test image
+        docker rmi "$image_tag" >/dev/null 2>&1 || true
+        docker rmi "$image_id" >/dev/null 2>&1 || true
+    fi
+
+    # Clean up artifact directory
+    rm -rf "$artifact_dir"
+}
+
+@test "verify_test_image() verifies image contains build artifacts from example/rust-project" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/rust-project" ]]; then
+        skip "example/rust-project not available"
+    fi
+
+    # Create a simple test image with artifacts
+    local test_image_tag="suitey-test-verify-$$"
+    local dockerfile_content="FROM alpine:latest
+RUN mkdir -p /app/target/debug
+RUN echo 'test artifact' > /app/target/debug/test-binary
+"
+
+    # Build test image
+    echo "$dockerfile_content" | docker build -t "$test_image_tag" - >/dev/null 2>&1
+    if [[ $? -ne 0 ]]; then
+        skip "Failed to create test image"
+    fi
+
+    # Verify image contains artifacts
+    local verification_config="image_tag=$test_image_tag
+artifact_paths=/app/target/debug/test-binary"
+
+    run verify_test_image "$verification_config"
+    assert_success
+
+    # Verify output indicates artifacts are present
+    assert_output --partial "verification_status=success"
+    assert_output --partial "artifacts_verified=true"
+
+    # Clean up
+    docker rmi "$test_image_tag" >/dev/null 2>&1 || true
+}
+
+@test "verify_test_image() verifies image contains source code from example/rust-project" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/rust-project" ]]; then
+        skip "example/rust-project not available"
+    fi
+
+    # Create a simple test image with source code
+    local test_image_tag="suitey-test-source-$$"
+    local dockerfile_content="FROM alpine:latest
+RUN mkdir -p /app/src
+RUN echo 'pub fn test() {}' > /app/src/lib.rs
+"
+
+    # Build test image
+    echo "$dockerfile_content" | docker build -t "$test_image_tag" - >/dev/null 2>&1
+    if [[ $? -ne 0 ]]; then
+        skip "Failed to create test image"
+    fi
+
+    # Verify image contains source code
+    local verification_config="image_tag=$test_image_tag
+source_paths=/app/src/lib.rs"
+
+    run verify_test_image "$verification_config"
+    assert_success
+
+    # Verify output indicates source is present
+    assert_output --partial "verification_status=success"
+    assert_output --partial "source_verified=true"
+
+    # Clean up
+    docker rmi "$test_image_tag" >/dev/null 2>&1 || true
+}
+
+@test "verify_test_image() verifies image contains test suites from example/rust-project" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/rust-project" ]]; then
+        skip "example/rust-project not available"
+    fi
+
+    # Create a simple test image with test suites
+    local test_image_tag="suitey-test-suites-$$"
+    local dockerfile_content="FROM alpine:latest
+RUN mkdir -p /app/tests
+RUN echo '#[test] fn test_example() {}' > /app/tests/integration_test.rs
+"
+
+    # Build test image
+    echo "$dockerfile_content" | docker build -t "$test_image_tag" - >/dev/null 2>&1
+    if [[ $? -ne 0 ]]; then
+        skip "Failed to create test image"
+    fi
+
+    # Verify image contains test suites
+    local verification_config="image_tag=$test_image_tag
+test_suite_paths=/app/tests/integration_test.rs"
+
+    run verify_test_image "$verification_config"
+    assert_success
+
+    # Verify output indicates test suites are present
+    assert_output --partial "verification_status=success"
+    assert_output --partial "test_suites_verified=true"
+
+    # Clean up
+    docker rmi "$test_image_tag" >/dev/null 2>&1 || true
+}
+

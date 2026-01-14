@@ -512,3 +512,285 @@ allocate_cpu_cores() {
     return 0
 }
 
+# Generate Dockerfile for test image
+# Usage: generate_test_image_dockerfile <image_config>
+# Returns: Dockerfile content as text
+# Behavior: Generates Dockerfile with base image, artifacts, source code, and test suites
+generate_test_image_dockerfile() {
+    local image_config="$1"
+
+    # Parse configuration
+    local base_image=$(echo "$image_config" | grep "^base_image=" | cut -d'=' -f2 || echo "")
+    local artifact_dir=$(echo "$image_config" | grep "^artifact_dir=" | cut -d'=' -f2 || echo "")
+    local project_root=$(echo "$image_config" | grep "^project_root=" | cut -d'=' -f2 || echo ".")
+    local framework=$(echo "$image_config" | grep "^framework=" | cut -d'=' -f2 || echo "")
+
+    # Validate required parameters
+    if [[ -z "$base_image" ]]; then
+        echo "Error: base_image is required" >&2
+        return 1
+    fi
+
+    # Start Dockerfile
+    echo "FROM $base_image"
+    echo ""
+    echo "# Set working directory"
+    echo "WORKDIR /app"
+    echo ""
+
+    # Copy build artifacts if artifact directory is specified
+    if [[ -n "$artifact_dir" ]] && [[ -d "$artifact_dir" ]]; then
+        echo "# Copy build artifacts"
+        echo "COPY artifacts/ /app/"
+        echo ""
+    fi
+
+    # Copy source code if project root is specified
+    if [[ -n "$project_root" ]] && [[ -d "$project_root" ]]; then
+        echo "# Copy source code"
+        # Copy source files (exclude common build/test directories)
+        echo "COPY source/ /app/"
+        echo ""
+    fi
+
+    # Copy test suites
+    if [[ -n "$project_root" ]] && [[ -d "$project_root" ]]; then
+        echo "# Copy test suites"
+        echo "COPY tests/ /app/tests/"
+        echo ""
+    fi
+
+    # Set environment variables based on framework
+    case "$framework" in
+        "rust"|"cargo")
+            echo "# Rust/Cargo environment"
+            echo "ENV CARGO_TARGET_DIR=/app/target"
+            echo "ENV RUST_BACKTRACE=1"
+            ;;
+        "python")
+            echo "# Python environment"
+            echo "ENV PYTHONPATH=/app"
+            ;;
+        "node"|"javascript")
+            echo "# Node.js environment"
+            echo "ENV NODE_PATH=/app"
+            ;;
+    esac
+
+    echo ""
+    echo "# Default command (can be overridden)"
+    echo "CMD [\"/bin/sh\"]"
+
+    return 0
+}
+
+# Build Docker image from generated Dockerfile
+# Usage: build_test_image <image_config>
+# Returns: Image build results in flat data format
+# Behavior: Builds Docker image with artifacts, source code, and test suites
+build_test_image() {
+    local image_config="$1"
+
+    # Parse configuration
+    local base_image=$(echo "$image_config" | grep "^base_image=" | cut -d'=' -f2 || echo "")
+    local artifact_dir=$(echo "$image_config" | grep "^artifact_dir=" | cut -d'=' -f2 || echo "")
+    local project_root=$(echo "$image_config" | grep "^project_root=" | cut -d'=' -f2 || echo ".")
+    local framework=$(echo "$image_config" | grep "^framework=" | cut -d'=' -f2 || echo "")
+    local image_tag=$(echo "$image_config" | grep "^image_tag=" | cut -d'=' -f2 || echo "")
+
+    # Validate required parameters
+    if [[ -z "$base_image" ]]; then
+        echo "Error: base_image is required" >&2
+        echo "build_status=error"
+        echo "error_message=base_image is required"
+        return 1
+    fi
+
+    # Generate image tag if not provided
+    if [[ -z "$image_tag" ]]; then
+        local timestamp
+        timestamp=$(date +%Y%m%d-%H%M%S 2>/dev/null || echo "$(date +%s)")
+        image_tag="suitey-test-${framework}-${timestamp}-$$"
+    fi
+
+    # Create temporary build context directory
+    local build_context
+    build_context=$(mktemp -d -t suitey-build-context-XXXXXX 2>/dev/null || echo "/tmp/suitey-build-context-$$")
+    mkdir -p "$build_context"
+
+    # Generate Dockerfile
+    local dockerfile_content
+    dockerfile_content=$(generate_test_image_dockerfile "$image_config" 2>/dev/null)
+    if [[ $? -ne 0 ]] || [[ -z "$dockerfile_content" ]]; then
+        echo "Error: Failed to generate Dockerfile" >&2
+        echo "build_status=error"
+        echo "error_message=Failed to generate Dockerfile"
+        rm -rf "$build_context"
+        return 1
+    fi
+
+    # Write Dockerfile to build context
+    echo "$dockerfile_content" > "$build_context/Dockerfile"
+
+    # Copy artifacts to build context if specified
+    if [[ -n "$artifact_dir" ]] && [[ -d "$artifact_dir" ]]; then
+        mkdir -p "$build_context/artifacts"
+        cp -r "$artifact_dir"/* "$build_context/artifacts/" 2>/dev/null || true
+    fi
+
+    # Copy source code to build context if specified
+    if [[ -n "$project_root" ]] && [[ -d "$project_root" ]]; then
+        mkdir -p "$build_context/source"
+        # Copy source files, excluding common build/test directories
+        find "$project_root" -type f \( -name "*.rs" -o -name "*.py" -o -name "*.js" -o -name "*.ts" -o -name "*.sh" -o -name "*.toml" -o -name "*.json" -o -name "*.yaml" -o -name "*.yml" \) ! -path "*/target/*" ! -path "*/node_modules/*" ! -path "*/.git/*" ! -path "*/tests/*" 2>/dev/null | while read -r file; do
+            local rel_path="${file#$project_root/}"
+            local dest_dir="$build_context/source/$(dirname "$rel_path")"
+            mkdir -p "$dest_dir"
+            cp "$file" "$build_context/source/$rel_path" 2>/dev/null || true
+        done
+    fi
+
+    # Copy test suites to build context if specified
+    if [[ -n "$project_root" ]] && [[ -d "$project_root/tests" ]]; then
+        mkdir -p "$build_context/tests"
+        cp -r "$project_root/tests"/* "$build_context/tests/" 2>/dev/null || true
+    fi
+
+    # Build Docker image
+    local build_output
+    build_output=$(cd "$build_context" && docker build -t "$image_tag" . 2>&1)
+    local build_exit_code=$?
+
+    # Clean up build context
+    rm -rf "$build_context" 2>/dev/null || true
+
+    if [[ $build_exit_code -ne 0 ]]; then
+        echo "Error: Failed to build Docker image: $build_output" >&2
+        echo "build_status=error"
+        echo "image_tag=$image_tag"
+        echo "error_message=Failed to build Docker image"
+        return 1
+    fi
+
+    # Get image ID
+    local image_id
+    image_id=$(docker images --format "{{.ID}}" "$image_tag" 2>/dev/null | head -1)
+
+    # Return results
+    echo "build_status=success"
+    echo "image_tag=$image_tag"
+    echo "image_id=$image_id"
+    echo "base_image=$base_image"
+    echo "framework=$framework"
+
+    return 0
+}
+
+# Verify test image contains required components
+# Usage: verify_test_image <verification_config>
+# Returns: Verification results in flat data format
+# Behavior: Verifies image contains artifacts, source code, and test suites
+verify_test_image() {
+    local verification_config="$1"
+
+    # Parse configuration
+    local image_tag=$(echo "$verification_config" | grep "^image_tag=" | cut -d'=' -f2 || echo "")
+    local artifact_paths=$(echo "$verification_config" | grep "^artifact_paths=" | cut -d'=' -f2- || echo "")
+    local source_paths=$(echo "$verification_config" | grep "^source_paths=" | cut -d'=' -f2- || echo "")
+    local test_suite_paths=$(echo "$verification_config" | grep "^test_suite_paths=" | cut -d'=' -f2- || echo "")
+
+    # Validate required parameters
+    if [[ -z "$image_tag" ]]; then
+        echo "Error: image_tag is required" >&2
+        echo "verification_status=error"
+        echo "error_message=image_tag is required"
+        return 1
+    fi
+
+    # Check if image exists
+    if ! docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "^${image_tag}" 2>/dev/null; then
+        # Try without tag (use latest)
+        if ! docker images --format "{{.ID}}" | grep -q "^${image_tag}" 2>/dev/null; then
+            echo "Error: Image not found: $image_tag" >&2
+            echo "verification_status=error"
+            echo "error_message=Image not found: $image_tag"
+            return 1
+        fi
+    fi
+
+    local artifacts_verified="false"
+    local source_verified="false"
+    local test_suites_verified="false"
+    local all_verified="true"
+
+    # Verify artifacts if specified
+    if [[ -n "$artifact_paths" ]]; then
+        local artifact_found="true"
+        while IFS= read -r path || [[ -n "$path" ]]; do
+            if [[ -n "$path" ]]; then
+                path=$(echo "$path" | tr -d '[:space:]')
+                if ! docker run --rm "$image_tag" test -f "$path" 2>/dev/null && ! docker run --rm "$image_tag" test -d "$path" 2>/dev/null; then
+                    artifact_found="false"
+                    break
+                fi
+            fi
+        done < <(echo "$artifact_paths" | tr ':' '\n')
+        if [[ "$artifact_found" == "true" ]]; then
+            artifacts_verified="true"
+        else
+            all_verified="false"
+        fi
+    fi
+
+    # Verify source code if specified
+    if [[ -n "$source_paths" ]]; then
+        local source_found="true"
+        while IFS= read -r path || [[ -n "$path" ]]; do
+            if [[ -n "$path" ]]; then
+                path=$(echo "$path" | tr -d '[:space:]')
+                if ! docker run --rm "$image_tag" test -f "$path" 2>/dev/null && ! docker run --rm "$image_tag" test -d "$path" 2>/dev/null; then
+                    source_found="false"
+                    break
+                fi
+            fi
+        done < <(echo "$source_paths" | tr ':' '\n')
+        if [[ "$source_found" == "true" ]]; then
+            source_verified="true"
+        else
+            all_verified="false"
+        fi
+    fi
+
+    # Verify test suites if specified
+    if [[ -n "$test_suite_paths" ]]; then
+        local test_suite_found="true"
+        while IFS= read -r path || [[ -n "$path" ]]; do
+            if [[ -n "$path" ]]; then
+                path=$(echo "$path" | tr -d '[:space:]')
+                if ! docker run --rm "$image_tag" test -f "$path" 2>/dev/null && ! docker run --rm "$image_tag" test -d "$path" 2>/dev/null; then
+                    test_suite_found="false"
+                    break
+                fi
+            fi
+        done < <(echo "$test_suite_paths" | tr ':' '\n')
+        if [[ "$test_suite_found" == "true" ]]; then
+            test_suites_verified="true"
+        else
+            all_verified="false"
+        fi
+    fi
+
+    # Return verification results
+    if [[ "$all_verified" == "true" ]]; then
+        echo "verification_status=success"
+    else
+        echo "verification_status=partial"
+    fi
+    echo "artifacts_verified=$artifacts_verified"
+    echo "source_verified=$source_verified"
+    echo "test_suites_verified=$test_suites_verified"
+    echo "image_tag=$image_tag"
+
+    return 0
+}
+
