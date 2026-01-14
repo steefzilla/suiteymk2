@@ -935,12 +935,12 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **3.3.1 Parallel Launch**
 *Launch multiple test suites in parallel Docker containers, limiting parallelism by CPU core count and tracking all containers.*
-- [ ] **Red**: Write test `tests/bats/unit/parallel_execution.bats`
+- [x] **Red**: Write test `tests/bats/unit/parallel_execution.bats`
   - Test: Launch multiple test suites in parallel
   - Test: Limit parallelism by CPU core count
   - Test: Track all running containers
-- [ ] **Green**: Implement parallel launch in `src/parallel_execution.sh`
-- [ ] **Refactor**: Improve parallel execution management
+- [x] **Green**: Implement parallel launch in `src/parallel_execution.sh`
+- [x] **Refactor**: Improve parallel execution management
 
 **3.3.2 Result Monitoring**
 *Poll result files in /tmp as tests complete (using unique filenames per Test Guidelines), update status in real-time, and handle test failures gracefully.*
@@ -974,9 +974,26 @@ This requirement applies to all phases and ensures code quality and test coverag
 - [ ] **Green**: Implement resource management
 - [ ] **Refactor**: Optimize resource usage
 
+**3.3.5 Memory Resource Management**
+*Implement memory detection, allocation, and monitoring for parallel execution with configurable memory limits.*
+- [ ] **Red**: Write tests for memory resource management
+  - Test: Detect available system memory
+  - Test: Calculate memory per container based on parallelism
+  - Test: Apply memory limits to Docker containers
+  - Test: Handle memory allocation failures gracefully
+  - Test: CLI memory options (--max-memory-per-container, --total-memory-limit, --memory-headroom)
+- [ ] **Green**: Implement memory resource management
+  - Implement `get_available_memory_gb()` function
+  - Implement `allocate_memory_gb()` function
+  - Add memory limits (--memory, --memory-swap) to container launch functions
+  - Add CLI memory options parsing and validation
+  - Use conservative memory calculation: (total_memory * (1 - headroom)) / max_parallel_jobs
+- [ ] **Refactor**: Optimize memory allocation algorithms and add memory usage monitoring
+
 **Acceptance Criteria**:
 - Can execute multiple test suites in parallel
-- Limits parallelism appropriately
+- Limits parallelism by CPU cores appropriately
+- Limits memory usage per container appropriately
 - Handles signals gracefully
 - Cleans up resources correctly
 
@@ -1113,15 +1130,17 @@ This requirement applies to all phases and ensures code quality and test coverag
 #### TDD Steps:
 
 **5.1.1 Command-Line Interface**
-*Add additional CLI options (--suite, --verbose) to suitey.sh, working with directory argument from Phase 0.3.6.*
+*Add additional CLI options (--suite, --verbose, memory options) to suitey.sh, working with directory argument from Phase 0.3.6.*
 - [ ] **Red**: Write test `tests/bats/integration/suitey_cli.bats`
   - Test: Parse command-line arguments (basic directory handling done in Phase 0.3.6)
   - Test: Handle `--suite` option
   - Test: Handle `--verbose` option
+  - Test: Handle memory options (--max-memory-per-container, --total-memory-limit, --memory-headroom)
   - Test: Handle invalid arguments (exit code 2)
-  - Test: Options work correctly with directory argument (e.g., `suitey.sh . --verbose`)
+  - Test: Options work correctly with directory argument (e.g., `suitey.sh . --verbose --max-memory-per-container 4`)
 - [ ] **Green**: Implement additional CLI options in `src/suitey.sh`
   - Note: Basic directory argument handling is already implemented in Phase 0.3.6
+  - Pass memory options to parallel execution manager
 - [ ] **Refactor**: Improve argument parsing, help text
 
 **5.1.2 Workflow Orchestration**

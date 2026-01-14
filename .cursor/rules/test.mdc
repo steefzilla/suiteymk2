@@ -1,0 +1,5 @@
+---
+description: How to test
+alwaysApply: false
+---
+Test using "bats -rj 16 TARGET" where TARGET is ./tests or ./tests/bats/SUITE or ./tests/bats/SUITE/FILE.bats.

@@ -499,6 +499,9 @@ Suitey is invoked via the `suitey.sh` script:
 **Future Options** (to be implemented in later phases):
 - `--suite SUITE_NAME` - Run only the specified test suite
 - `--verbose` - Enable verbose output
+- `--max-memory-per-container GB` - Limit memory per container (default: auto-calculated)
+- `--total-memory-limit GB` - Total memory Suitey can use
+- `--memory-headroom PERCENT` - Memory reserved for system (default: 20%)
 
 ### Exit Codes
 
@@ -590,6 +593,11 @@ Reports are generated as standalone HTML files with embedded CSS and JavaScript 
      - Calculates duration
      - Extracts test counts from output (using module's parser)
      - Writes structured results to a suite-specific result file
+   - **Resource Management**: Limits concurrent containers by available CPU cores and memory:
+     - CPU limiting: Dynamically detects available cores and allocates appropriately
+     - Memory limiting: Detects available system memory and applies conservative per-container limits
+     - Command-line options: `--max-memory-per-container`, `--total-memory-limit`, `--memory-headroom`
+     - Conservative calculation: `(total_memory × (1 - headroom)) / max_parallel_jobs`
 
 5. **Result Monitoring**:
    - **Verbose mode**: Stream output directly from temporary output files as builds and tests run
