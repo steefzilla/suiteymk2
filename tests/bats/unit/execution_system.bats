@@ -714,3 +714,152 @@ test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out"
     assert_output --partial "status=failed"
 }
 
+@test "execute_test_suite_with_module() uses module's execution method on example/rust-project" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/rust-project" ]]; then
+        skip "example/rust-project not available"
+    fi
+
+    # Source module registry
+    source "src/mod_registry.sh" 2>/dev/null || true
+
+    # Load cargo module
+    if [[ -f "mod/frameworks/cargo/mod.sh" ]]; then
+        source "mod/frameworks/cargo/mod.sh" 2>/dev/null || true
+    else
+        skip "Cargo module not found"
+    fi
+
+    # Call module's execute_test_suite method
+    local test_suite="rust-tests"
+    local test_image="rust:1.70-slim"
+    local execution_config="working_directory=/app"
+
+    run execute_test_suite_with_module "cargo-module" "$test_suite" "$test_image" "$execution_config"
+    assert_success
+
+    # Verify execution result contains test command
+    assert_output --partial "test_command="
+    assert_output --partial "execution_method="
+}
+
+@test "execute_test_suite_with_module() uses module's execution method on example/bats-project" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    if [[ ! -d "example/bats-project" ]]; then
+        skip "example/bats-project not available"
+    fi
+
+    # Source module registry
+    source "src/mod_registry.sh" 2>/dev/null || true
+
+    # Load bats module
+    if [[ -f "mod/frameworks/bats/mod.sh" ]]; then
+        source "mod/frameworks/bats/mod.sh" 2>/dev/null || true
+    else
+        skip "BATS module not found"
+    fi
+
+    # Call module's execute_test_suite method
+    local test_suite="bats-tests"
+    local test_image="bats/bats:latest"
+    local execution_config="working_directory=/app"
+
+    run execute_test_suite_with_module "bats-module" "$test_suite" "$test_image" "$execution_config"
+    assert_success
+
+    # Verify execution result contains test command
+    assert_output --partial "test_command="
+    assert_output --partial "execution_method="
+}
+
+@test "execute_test_suite_with_module() handles missing modules gracefully" {
+    # Source module registry
+    source "src/mod_registry.sh" 2>/dev/null || true
+
+    # Try to execute with non-existent module
+    local test_suite="test-suite"
+    local test_image="test-image"
+    local execution_config=""
+
+    run execute_test_suite_with_module "nonexistent-module" "$test_suite" "$test_image" "$execution_config"
+    assert_failure
+    assert_output --partial "error_message="
+}
+
+@test "parse_test_results_with_module() handles missing modules gracefully using example projects" {
+    # Source module registry
+    source "src/mod_registry.sh" 2>/dev/null || true
+
+    local test_output="test output"
+    local exit_code=0
+
+    # Try to parse with non-existent module
+    run parse_test_results_with_module "nonexistent-module" "$test_output" "$exit_code"
+    assert_failure
+    assert_output --partial "error_message="
+}
+
+@test "execute_test_suite_with_module() and parse_test_results_with_module() work together" {
+    # Skip if Docker is not available
+    if ! command -v docker >/dev/null 2>&1; then
+        skip "Docker is not available"
+    fi
+
+    if ! docker info >/dev/null 2>&1; then
+        skip "Docker daemon is not running"
+    fi
+
+    # Source module registry
+    source "src/mod_registry.sh" 2>/dev/null || true
+
+    # Load cargo module
+    if [[ -f "mod/frameworks/cargo/mod.sh" ]]; then
+        source "mod/frameworks/cargo/mod.sh" 2>/dev/null || true
+    else
+        skip "Cargo module not found"
+    fi
+
+    # Get execution configuration from module
+    local test_suite="rust-tests"
+    local test_image="rust:1.70-slim"
+    local execution_config="working_directory=/app"
+
+    local execution_result
+    execution_result=$(execute_test_suite_with_module "cargo-module" "$test_suite" "$test_image" "$execution_config" 2>&1)
+    assert [ $? -eq 0 ]
+
+    # Extract test command from execution result
+    local test_command
+    test_command=$(echo "$execution_result" | grep "^test_command=" | cut -d'=' -f2- || echo "")
+
+    # Verify we got a test command
+    assert [ -n "$test_command" ]
+
+    # Now parse some test output using the same module
+    local test_output="running 1 test
+test test_add ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out"
+    local exit_code=0
+
+    run parse_test_results_with_module "cargo-module" "$test_output" "$exit_code"
+    assert_success
+    assert_output --partial "status="
+}
+

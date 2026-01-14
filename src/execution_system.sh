@@ -547,3 +547,110 @@ parse_test_results_with_module() {
     fi
 }
 
+# Execute test suite using module's execute_test_suite() method
+# Usage: execute_test_suite_with_module <module_identifier> <test_suite> <test_image> <execution_config>
+# Returns: Execution configuration in flat data format
+# Behavior: Sources the module, calls its execute_test_suite() method, and returns execution configuration
+execute_test_suite_with_module() {
+    local module_identifier="$1"
+    local test_suite="$2"
+    local test_image="$3"
+    local execution_config="$4"
+
+    # Validate required parameters
+    if [[ -z "$module_identifier" ]]; then
+        echo "Error: module_identifier is required" >&2
+        echo "status=error"
+        echo "error_message=module_identifier is required"
+        return 1
+    fi
+
+    if [[ -z "$test_suite" ]]; then
+        echo "Error: test_suite is required" >&2
+        echo "status=error"
+        echo "error_message=test_suite is required"
+        return 1
+    fi
+
+    # Get module file path from identifier
+    # Module identifiers follow pattern: {name}-module
+    # Module files are at: mod/languages/{name}/mod.sh, mod/frameworks/{name}/mod.sh, or mod/tools/{name}/mod.sh
+    local module_file=""
+    local name="${module_identifier%-module}"
+
+    # Try framework modules first (most common for test execution)
+    if [[ -f "mod/frameworks/${name}/mod.sh" ]]; then
+        module_file="mod/frameworks/${name}/mod.sh"
+    # Try language modules
+    elif [[ -f "mod/languages/${name}/mod.sh" ]]; then
+        module_file="mod/languages/${name}/mod.sh"
+    # Try tool modules
+    elif [[ -f "mod/tools/${name}/mod.sh" ]]; then
+        module_file="mod/tools/${name}/mod.sh"
+    fi
+
+    # If module file not found, try to get from registry
+    if [[ -z "$module_file" ]] || [[ ! -f "$module_file" ]]; then
+        # Check if module is registered
+        if declare -f get_module >/dev/null 2>&1; then
+            local module_name
+            module_name=$(get_module "$module_identifier" 2>/dev/null || echo "")
+            if [[ -n "$module_name" ]]; then
+                # Extract path from module name (format: mod/.../mod.sh)
+                module_file="$module_name"
+            fi
+        fi
+    fi
+
+    # If still not found, return error
+    if [[ -z "$module_file" ]] || [[ ! -f "$module_file" ]]; then
+        echo "Error: Module not found: $module_identifier" >&2
+        echo "status=error"
+        echo "error_message=Module not found: $module_identifier"
+        return 1
+    fi
+
+    # Clean up any existing module functions to avoid conflicts
+    for method in detect check_binaries discover_test_suites detect_build_requirements get_build_steps execute_test_suite parse_test_results get_metadata; do
+        unset -f "$method" 2>/dev/null || true
+    done
+
+    # Source the module
+    if ! source "$module_file" 2>/dev/null; then
+        echo "Error: Failed to load module: $module_file" >&2
+        echo "status=error"
+        echo "error_message=Failed to load module: $module_file"
+        return 1
+    fi
+
+    # Verify execute_test_suite function exists
+    if ! declare -f execute_test_suite >/dev/null 2>&1; then
+        echo "Error: Module does not implement execute_test_suite() method" >&2
+        echo "status=error"
+        echo "error_message=Module does not implement execute_test_suite() method"
+        return 1
+    fi
+
+    # Call module's execute_test_suite() method
+    # Use subshell to avoid polluting current environment
+    local execution_result
+    execution_result=$(execute_test_suite "$test_suite" "$test_image" "$execution_config" 2>&1)
+    local execution_exit_code=$?
+
+    # Clean up module functions after use
+    for method in detect check_binaries discover_test_suites detect_build_requirements get_build_steps execute_test_suite parse_test_results get_metadata; do
+        unset -f "$method" 2>/dev/null || true
+    done
+
+    # Return execution results
+    if [[ $execution_exit_code -eq 0 ]]; then
+        echo "$execution_result"
+        return 0
+    else
+        # Even if execution failed, return what we got (module may have returned partial results)
+        echo "$execution_result"
+        echo "execution_status=error" >> /dev/stderr || true
+        return 1
+    fi
+}
+
