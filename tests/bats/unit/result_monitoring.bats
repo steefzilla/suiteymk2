@@ -159,7 +159,7 @@ EOF
 
 @test "poll_test_results() handles test failures gracefully" {
     # Create a result file with failure status
-    local suite_id="failed-suite"
+    local suite_id="failed-suite-${TEST_UNIQUE_ID}"
     local pid=$$
     local random=$RANDOM
 
@@ -217,7 +217,7 @@ EOF
 
 @test "poll_test_results() handles multiple result files with same suite_id but different unique suffixes" {
     # Create multiple result files for the same suite (simulating retries or multiple runs)
-    local suite_id="multi-suite"
+    local suite_id="multi-suite-${TEST_UNIQUE_ID}"
     local result_files=()
 
     for i in {1..3}; do
@@ -270,7 +270,7 @@ EOF
 
 @test "poll_test_results() handles atomic writes (only reads fully written files)" {
     # Create a result file that is still being written (simulate atomic write in progress)
-    local suite_id="atomic-suite"
+    local suite_id="atomic-suite-${TEST_UNIQUE_ID}"
     local pid=$$
     local random=$RANDOM
 
@@ -301,7 +301,7 @@ EOF
 
 @test "poll_test_results() tracks processed files to avoid re-reading" {
     # Create a result file
-    local suite_id="tracking-suite"
+    local suite_id="tracking-suite-${TEST_UNIQUE_ID}"
     local pid=$$
     local random=$RANDOM
 
@@ -334,21 +334,27 @@ EOF
     assert [ $? -eq 0 ] || [ $? -eq 1 ]
 }
 
-@test "poll_test_results() handles empty /tmp directory gracefully" {
-    # Ensure /tmp is clean
-    rm -f /tmp/suitey_test_result_* /tmp/suitey_test_output_* 2>/dev/null || true
-
-    # Poll for results in empty directory
+@test "poll_test_results() handles no new results gracefully" {
+    # This test verifies poll_test_results works when there are no NEW unprocessed files.
+    # We don't clear all files (to avoid race conditions with parallel tests).
+    # Instead, we call poll twice - the second call should find no new results
+    # since we already processed them in the first call.
+    
+    # First call may find results from other tests (that's fine)
     run poll_test_results
     assert_success
-
-    # Should return appropriate "no results" indication
+    
+    # Second call should find no NEW results since we just processed them
+    run poll_test_results
+    assert_success
+    
+    # Should return appropriate "no new results" indication
     assert_output --partial "results_found=0"
 }
 
 @test "poll_test_results() handles malformed result files gracefully" {
     # Create a malformed result file
-    local suite_id="malformed-suite"
+    local suite_id="malformed-suite-${TEST_UNIQUE_ID}"
     local pid=$$
     local random=$RANDOM
 
@@ -526,9 +532,9 @@ EOF
 
 @test "poll_test_results() handles suite_id with multiple hyphens" {
     # Test with suite_id containing multiple hyphens
-    local suite_id="my-test-suite-name"
-    local pid=12345
-    local random=67890
+    local suite_id="my-test-suite-name-${TEST_UNIQUE_ID}"
+    local pid=$$
+    local random=$RANDOM
     local result_file="/tmp/suitey_test_result_${suite_id}_${pid}_${random}"
     
     # Create result file
@@ -636,7 +642,7 @@ EOF
 }
 
 @test "poll_test_results() file creation is immediately visible to find command" {
-    local suite_id="visibility-test"
+    local suite_id="visibility-test-${TEST_UNIQUE_ID}"
     local pid=$$
     local random=$RANDOM
     local result_file="/tmp/suitey_test_result_${suite_id}_${pid}_${random}"

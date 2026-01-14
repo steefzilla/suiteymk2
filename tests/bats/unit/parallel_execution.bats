@@ -22,6 +22,9 @@ setup() {
         source "src/parallel_execution.sh"
     fi
 
+    # Create unique identifier for this test to avoid race conditions with parallel tests
+    TEST_UNIQUE_ID="parexec_${BATS_TEST_NUMBER}_$$_${RANDOM}"
+
     # Track containers and images created during tests for cleanup
     TEST_CONTAINERS=()
     TEST_IMAGES=()
@@ -44,8 +47,12 @@ teardown() {
     done
     TEST_IMAGES=()
 
-    # Clean up any remaining result files
-    rm -f /tmp/suitey_test_result_* /tmp/suitey_test_output_* 2>/dev/null || true
+    # Only clean up files belonging to THIS test (using TEST_UNIQUE_ID)
+    if [[ -n "$TEST_UNIQUE_ID" ]]; then
+        rm -f /tmp/*"${TEST_UNIQUE_ID}"* 2>/dev/null || true
+    fi
+    
+    unset TEST_UNIQUE_ID
 }
 
 @test "launch_test_suites_parallel() launches multiple test suites in parallel" {

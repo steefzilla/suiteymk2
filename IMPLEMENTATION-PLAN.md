@@ -975,29 +975,29 @@ This requirement applies to all phases and ensures code quality and test coverag
 - [x] **Refactor**: Optimize resource usage
 
 **3.3.5 Memory Resource Management**
-*Implement memory detection, allocation, and monitoring for parallel execution with configurable memory limits.*
-- [x] **Red**: Write tests for memory resource management
-  - Test: Detect available system memory
-  - Test: Calculate memory per container based on parallelism
-  - Test: Apply memory limits to Docker containers
-  - Test: Handle memory allocation failures gracefully
-  - Test: CLI memory options (--max-memory-per-container, --total-memory-limit, --memory-headroom)
-- [x] **Green**: Implement memory resource management
-  - Implement `get_available_memory_gb()` function
-  - Implement `get_total_memory_gb()` function
-  - Implement `calculate_memory_per_container_gb()` function
-  - Implement `apply_memory_limits_to_container()` function
-  - Implement `allocate_memory_for_containers()` function
-  - Implement `parse_memory_cli_options()` function
-  - Add memory limits (--memory, --memory-swap) to container launch functions
-  - Add CLI memory options parsing and validation
-  - Use conservative memory calculation: (total_memory * (1 - headroom)) / max_parallel_jobs
-- [x] **Refactor**: Optimize memory allocation algorithms and add memory usage monitoring
+*Limit concurrent test runners based on available system memory - don't start a new container if insufficient memory is available.*
+- [x] **Red**: Write tests for memory-based parallelism limiting
+  - Test: Detect available system memory in real-time
+  - Test: Calculate memory required per test runner
+  - Test: Block container launch when available memory < required memory
+  - Test: Resume launching when memory becomes available
+  - Test: Memory-based limit works alongside CPU-based limit (use whichever is more restrictive)
+  - Test: CLI memory options (--memory-per-runner, --memory-headroom)
+- [x] **Green**: Implement memory-based parallelism limiting
+  - Implement `get_available_memory_mb()` to detect current available memory
+  - Implement `get_memory_per_runner_mb()` to calculate/configure memory needed per runner
+  - Add pre-launch memory check in `launch_test_suites_parallel()`:
+    - Before launching each container, check `available_memory >= memory_per_runner`
+    - If insufficient memory, wait and retry (poll every 1-2 seconds)
+    - Log when waiting for memory to become available
+  - Integrate memory limit with existing CPU-based limit (launch when BOTH conditions met)
+  - Add CLI options: `--max-memory-per-container`, `--total-memory-limit`, `--memory-headroom` (default: 20%)
+- [x] **Refactor**: Optimize polling interval, add memory pressure detection
 
 **Acceptance Criteria**:
 - Can execute multiple test suites in parallel
 - Limits parallelism by CPU cores appropriately
-- Limits memory usage per container appropriately
+- Limits parallelism by available memory (don't start runner if insufficient memory)
 - Handles signals gracefully
 - Cleans up resources correctly
 
@@ -1139,9 +1139,9 @@ This requirement applies to all phases and ensures code quality and test coverag
   - Test: Parse command-line arguments (basic directory handling done in Phase 0.3.6)
   - Test: Handle `--suite` option
   - Test: Handle `--verbose` option
-  - Test: Handle memory options (--max-memory-per-container, --total-memory-limit, --memory-headroom)
+  - Test: Handle memory options (--memory-per-runner, --memory-headroom)
   - Test: Handle invalid arguments (exit code 2)
-  - Test: Options work correctly with directory argument (e.g., `suitey.sh . --verbose --max-memory-per-container 4`)
+  - Test: Options work correctly with directory argument (e.g., `suitey.sh . --verbose --memory-per-runner 2`)
 - [ ] **Green**: Implement additional CLI options in `src/suitey.sh`
   - Note: Basic directory argument handling is already implemented in Phase 0.3.6
   - Pass memory options to parallel execution manager
@@ -1205,7 +1205,7 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 4. **Docker Operations**: Use Docker containers for all builds and test execution. Clean up containers and images appropriately.
 
-5. **Parallel Execution**: Limit parallelism based on CPU core count. Balance speed with resource usage.
+5. **Parallel Execution**: Limit parallelism based on CPU core count and available memory. Don't start new runners when system memory is insufficient. Balance speed with resource usage.
 
 6. **Testing**: Follow TDD strictly. Write tests first, implement minimal code, refactor. Keep tests green.
 

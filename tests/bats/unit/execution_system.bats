@@ -15,6 +15,9 @@ setup() {
         source "src/execution_system.sh"
     fi
 
+    # Create unique identifier for this test to avoid race conditions with parallel tests
+    TEST_UNIQUE_ID="execsys_${BATS_TEST_NUMBER}_$$_${RANDOM}"
+
     # Track containers created during tests for cleanup
     TEST_CONTAINERS=()
     TEST_IMAGES=()
@@ -37,6 +40,13 @@ teardown() {
         fi
     done
     TEST_IMAGES=()
+
+    # Only clean up files belonging to THIS test (using TEST_UNIQUE_ID)
+    if [[ -n "$TEST_UNIQUE_ID" ]]; then
+        rm -f /tmp/*"${TEST_UNIQUE_ID}"* 2>/dev/null || true
+    fi
+    
+    unset TEST_UNIQUE_ID
 }
 
 @test "launch_test_container() launches test container with pre-built image using example/rust-project" {
@@ -412,7 +422,7 @@ container_name=suitey-test-collect-$$"
     assert [ $? -eq 0 ]
 
     # Collect test results
-    local suite_id="rust-test-suite"
+    local suite_id="rust-test-suite-${TEST_UNIQUE_ID}"
     run collect_test_results "$suite_id" "$test_result"
     assert_success
 
@@ -440,7 +450,7 @@ container_name=suitey-test-collect-$$"
 
 @test "collect_test_results() uses atomic writes (write to temp, then mv)" {
     # Create mock test result data
-    local suite_id="test-suite-atomic"
+    local suite_id="test-suite-atomic-${TEST_UNIQUE_ID}"
     local test_result="container_id=abc123
 test_status=passed
 exit_code=0
@@ -469,7 +479,7 @@ stderr="
 
 @test "collect_test_results() creates unique filenames to prevent race conditions" {
     # Create multiple test results with same suite_id
-    local suite_id="test-suite-parallel"
+    local suite_id="test-suite-parallel-${TEST_UNIQUE_ID}"
     local test_result1="container_id=container1
 test_status=passed
 exit_code=0
@@ -515,7 +525,7 @@ stderr="
 }
 
 @test "collect_test_results() writes output file with stdout and stderr" {
-    local suite_id="test-suite-output"
+    local suite_id="test-suite-output-${TEST_UNIQUE_ID}"
     local test_result="container_id=abc123
 test_status=passed
 exit_code=0
@@ -888,7 +898,7 @@ stderr=error message"
 }
 
 @test "collect_test_results() creates result file that can be found" {
-    local suite_id="file-creation-test"
+    local suite_id="file-creation-test-${TEST_UNIQUE_ID}"
     local test_result="test_status=passed
 exit_code=0"
     
@@ -906,7 +916,7 @@ exit_code=0"
 }
 
 @test "collect_test_results() output file contains content when stdout provided" {
-    local suite_id="output-content-test"
+    local suite_id="output-content-test-${TEST_UNIQUE_ID}"
     local test_result="test_status=passed
 exit_code=0
 stdout=expected output content

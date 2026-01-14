@@ -19,6 +19,9 @@ setup() {
         source "src/build_manager.sh"
     fi
 
+    # Create unique identifier for this test to avoid race conditions with parallel tests
+    TEST_UNIQUE_ID="intexec_${BATS_TEST_NUMBER}_$$_${RANDOM}"
+
     # Track containers and images created during tests for cleanup
     TEST_CONTAINERS=()
     TEST_IMAGES=()
@@ -50,8 +53,12 @@ teardown() {
     done
     TEST_RESULT_FILES=()
 
-    # Clean up any remaining result files matching our pattern
-    rm -f /tmp/suitey_test_result_* /tmp/suitey_test_output_* 2>/dev/null || true
+    # Only clean up files belonging to THIS test (using TEST_UNIQUE_ID)
+    if [[ -n "$TEST_UNIQUE_ID" ]]; then
+        rm -f /tmp/*"${TEST_UNIQUE_ID}"* 2>/dev/null || true
+    fi
+    
+    unset TEST_UNIQUE_ID
 }
 
 @test "Integration: Execute example/rust-project tests in container" {
@@ -117,7 +124,7 @@ container_name=suitey-integration-rust-$$"
     assert_output --partial "stderr="
 
     # Step 4: Collect test results
-    local suite_id="rust-integration-test"
+    local suite_id="rust-integration-test-${TEST_UNIQUE_ID}"
     local test_result="$output"
     run collect_test_results "$suite_id" "$test_result"
     assert_success
@@ -227,7 +234,7 @@ container_name=suitey-integration-bats-$$"
     assert_output --partial "stderr="
 
     # Step 4: Collect test results
-    local suite_id="bats-integration-test"
+    local suite_id="bats-integration-test-${TEST_UNIQUE_ID}"
     local test_result="$output"
     run collect_test_results "$suite_id" "$test_result"
     assert_success

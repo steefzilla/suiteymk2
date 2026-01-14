@@ -22,6 +22,9 @@ setup() {
         source "src/parallel_execution.sh"
     fi
 
+    # Create unique identifier for this test to avoid race conditions with parallel tests
+    TEST_UNIQUE_ID="signal_${BATS_TEST_NUMBER}_$$_${RANDOM}"
+
     # Track containers and images created during tests for cleanup
     TEST_CONTAINERS=()
     TEST_IMAGES=()
@@ -48,9 +51,16 @@ teardown() {
     done
     TEST_IMAGES=()
 
+    # Only clean up files belonging to THIS test (using TEST_UNIQUE_ID)
+    if [[ -n "$TEST_UNIQUE_ID" ]]; then
+        rm -f /tmp/*"${TEST_UNIQUE_ID}"* 2>/dev/null || true
+    fi
+
     # Reset signal state
     SIGNAL_RECEIVED=""
     FORCE_KILL_TRIGGERED=""
+    
+    unset TEST_UNIQUE_ID
 }
 
 @test "setup_signal_handlers() sets up SIGINT handler" {
@@ -228,10 +238,10 @@ CMD sleep 300"
 }
 
 @test "cleanup_temp_files() removes temporary files from /tmp" {
-    # Create temporary test files
-    local temp_file1="/tmp/suitey_test_result_test1_$$_$RANDOM"
-    local temp_file2="/tmp/suitey_test_output_test1_$$_$RANDOM"
-    local temp_file3="/tmp/suitey_other_temp_$$_$RANDOM"
+    # Create temporary test files with unique ID to avoid parallel test conflicts
+    local temp_file1="/tmp/suitey_test_result_${TEST_UNIQUE_ID}_1"
+    local temp_file2="/tmp/suitey_test_output_${TEST_UNIQUE_ID}_2"
+    local temp_file3="/tmp/suitey_other_temp_${TEST_UNIQUE_ID}_3"
 
     # Create the files
     echo "test result 1" > "$temp_file1"
@@ -243,8 +253,8 @@ CMD sleep 300"
     assert [ -f "$temp_file2" ]
     assert [ -f "$temp_file3" ]
 
-    # Clean up temporary files
-    run cleanup_temp_files
+    # Clean up temporary files (using pattern to only clean up THIS test's files)
+    run cleanup_temp_files "${TEST_UNIQUE_ID}"
     assert_success
 
     # Should report successful cleanup
