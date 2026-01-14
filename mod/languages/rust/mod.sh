@@ -134,7 +134,7 @@ get_build_steps() {
     requires_build=$(echo "$build_requirements" | grep "^requires_build=" | cut -d'=' -f2 || echo "false")
 
     if [[ "$requires_build" != "true" ]]; then
-        echo "build_steps_count=0"
+    echo "build_steps_count=0"
         return 0
     fi
 

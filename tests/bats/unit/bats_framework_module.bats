@@ -100,15 +100,15 @@ teardown() {
 @test "BATS framework module implements parse_test_results() method" {
     if [[ -f "mod/frameworks/bats/mod.sh" ]]; then
         source "mod/frameworks/bats/mod.sh"
-
+        
         # Check that parse_test_results() exists
         run declare -f parse_test_results
         assert_success
-
+        
         # Test parse_test_results() returns flat data format
         run parse_test_results "test output" 0
         assert_success
-
+        
         # Should return flat data format
         assert_output --partial "total_tests="
         assert_output --partial "status="

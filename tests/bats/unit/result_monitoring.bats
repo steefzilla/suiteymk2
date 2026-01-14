@@ -25,6 +25,9 @@ setup() {
     # Clean up any existing test result files
     rm -f /tmp/suitey_test_result_* /tmp/suitey_test_output_* 2>/dev/null || true
 
+    # Reset global state to ensure clean test environment
+    PROCESSED_RESULT_FILES=""
+
     # Track result files created during tests for cleanup
     TEST_RESULT_FILES=()
     TEST_OUTPUT_FILES=()
@@ -365,4 +368,330 @@ EOF
         # If it succeeded, should indicate the malformed file was encountered
         assert_output --partial "suite_id=$suite_id"
     fi
+}
+
+# Diagnostic tests to isolate the regex parsing issue
+@test "poll_test_results() regex correctly parses filename with hyphenated suite_id" {
+    # Test the regex pattern matching with a hyphenated suite_id
+    local filename="suitey_test_result_test-suite-1_12345_67890"
+    local suite_id=""
+    local pid_part=""
+    local random_part=""
+    
+    if [[ "$filename" =~ suitey_test_result_(.+)_(.+)_(.+)$ ]]; then
+        suite_id="${BASH_REMATCH[1]}"
+        pid_part="${BASH_REMATCH[2]}"
+        random_part="${BASH_REMATCH[3]}"
+    fi
+    
+    # Verify parsing worked correctly
+    assert_equal "$suite_id" "test-suite-1"
+    assert_equal "$pid_part" "12345"
+    assert_equal "$random_part" "67890"
+}
+
+@test "poll_test_results() regex correctly parses filename with underscore suite_id" {
+    # Test with underscore-separated suite_id
+    local filename="suitey_test_result_test_suite_1_12345_67890"
+    local suite_id=""
+    local pid_part=""
+    local random_part=""
+    
+    if [[ "$filename" =~ suitey_test_result_(.+)_(.+)_(.+)$ ]]; then
+        suite_id="${BASH_REMATCH[1]}"
+        pid_part="${BASH_REMATCH[2]}"
+        random_part="${BASH_REMATCH[3]}"
+    fi
+    
+    # Verify parsing worked correctly
+    assert_equal "$suite_id" "test_suite_1"
+    assert_equal "$pid_part" "12345"
+    assert_equal "$random_part" "67890"
+}
+
+@test "poll_test_results() regex correctly parses filename with simple suite_id" {
+    # Test with simple suite_id (no special chars)
+    local filename="suitey_test_result_suite1_12345_67890"
+    local suite_id=""
+    local pid_part=""
+    local random_part=""
+    
+    if [[ "$filename" =~ suitey_test_result_(.+)_(.+)_(.+)$ ]]; then
+        suite_id="${BASH_REMATCH[1]}"
+        pid_part="${BASH_REMATCH[2]}"
+        random_part="${BASH_REMATCH[3]}"
+    fi
+    
+    # Verify parsing worked correctly
+    assert_equal "$suite_id" "suite1"
+    assert_equal "$pid_part" "12345"
+    assert_equal "$random_part" "67890"
+}
+
+@test "poll_test_results() regex correctly parses filename with multiple hyphens in suite_id" {
+    # Diagnostic test: verify regex behavior with multiple hyphens
+    local filename="suitey_test_result_my-test-suite-name_12345_67890"
+    local suite_id=""
+    local pid_part=""
+    local random_part=""
+    
+    # Use the exact regex from poll_test_results()
+    if [[ "$filename" =~ suitey_test_result_(.+)_(.+)_(.+)$ ]]; then
+        suite_id="${BASH_REMATCH[1]}"
+        pid_part="${BASH_REMATCH[2]}"
+        random_part="${BASH_REMATCH[3]}"
+    fi
+    
+    # This will reveal if the regex fails with multiple hyphens
+    assert_equal "$suite_id" "my-test-suite-name"
+    assert_equal "$pid_part" "12345"
+    assert_equal "$random_part" "67890"
+}
+
+@test "poll_test_results() find command locates files with hyphenated suite_id" {
+    # Create a test file with hyphenated suite_id
+    local suite_id="test-suite-1"
+    local pid=12345
+    local random=67890
+    local result_file="/tmp/suitey_test_result_${suite_id}_${pid}_${random}"
+    
+    # Create the file
+    echo "test_status=passed" > "$result_file"
+    TEST_RESULT_FILES+=("$result_file")
+    
+    # Verify file exists
+    assert [ -f "$result_file" ]
+    
+    # Verify find can locate it
+    local found_files
+    found_files=$(find /tmp -name "suitey_test_result_*" -type f 2>/dev/null || true)
+    
+    assert [ -n "$found_files" ]
+    # Check if result_file path appears in found_files
+    case "$found_files" in
+        *"$result_file"*)
+            assert true
+            ;;
+        *)
+            assert false "File $result_file not found by find command"
+            ;;
+    esac
+}
+
+@test "poll_test_results() processes file with hyphenated suite_id correctly" {
+    # Create a test file matching the exact pattern from the failing test
+    local suite_id="test-suite-1"
+    local pid=$$
+    local random=$RANDOM
+    local result_file="/tmp/suitey_test_result_${suite_id}_${pid}_${random}"
+    local output_file="/tmp/suitey_test_output_${suite_id}_${pid}_${random}"
+    
+    # Create result file with content
+    cat > "$result_file" << EOF
+test_status=passed
+exit_code=0
+duration=1.23
+total_tests=5
+passed_tests=5
+failed_tests=0
+skipped_tests=0
+status=passed
+EOF
+    
+    # Create output file
+    echo "Test output content" > "$output_file"
+    
+    TEST_RESULT_FILES+=("$result_file")
+    TEST_OUTPUT_FILES+=("$output_file")
+    
+    # Reset processed files to ensure this file is processed
+    PROCESSED_RESULT_FILES=""
+    
+    # Poll for results
+    run poll_test_results
+    assert_success
+    
+    # Should find the result file
+    assert_output --partial "suite_id=$suite_id"
+    assert_output --partial "status=passed"
+    assert_output --partial "result_file=$result_file"
+    assert_output --partial "output_file=$output_file"
+}
+
+@test "poll_test_results() handles suite_id with multiple hyphens" {
+    # Test with suite_id containing multiple hyphens
+    local suite_id="my-test-suite-name"
+    local pid=12345
+    local random=67890
+    local result_file="/tmp/suitey_test_result_${suite_id}_${pid}_${random}"
+    
+    # Create result file
+    echo "test_status=passed" > "$result_file"
+    TEST_RESULT_FILES+=("$result_file")
+    
+    # Reset processed files
+    PROCESSED_RESULT_FILES=""
+    
+    # Poll for results
+    run poll_test_results
+    assert_success
+    
+    # Should find and parse correctly
+    assert_output --partial "suite_id=$suite_id"
+}
+
+@test "poll_test_results() regex fails to match when suite_id contains underscores that could be confused with separators" {
+    # This test checks if the regex has issues with suite_ids that contain underscores
+    # The pattern expects: suitey_test_result_<suite_id>_<pid>_<random>
+    # If suite_id is "test_suite_1", the regex might incorrectly parse it
+    
+    local filename="suitey_test_result_test_suite_1_12345_67890"
+    local suite_id=""
+    local pid_part=""
+    local random_part=""
+    
+    if [[ "$filename" =~ suitey_test_result_(.+)_(.+)_(.+)$ ]]; then
+        suite_id="${BASH_REMATCH[1]}"
+        pid_part="${BASH_REMATCH[2]}"
+        random_part="${BASH_REMATCH[3]}"
+    fi
+    
+    # The regex is greedy, so it might match incorrectly
+    # This test will reveal if the regex has issues with underscore-separated suite_ids
+    # Expected: suite_id="test_suite_1", but greedy matching might give suite_id="test_suite_1_12345"
+    # Actually wait - the regex has three groups, so it should work, but let's verify
+    assert_equal "$suite_id" "test_suite_1"
+    assert_equal "$pid_part" "12345"
+    assert_equal "$random_part" "67890"
+}
+
+@test "poll_test_results() while loop processes find output correctly" {
+    # Test that the while loop correctly processes find output
+    # This simulates the exact scenario from poll_test_results()
+    
+    local suite_id="test-suite-1"
+    local pid=$$
+    local random=$RANDOM
+    local result_file="/tmp/suitey_test_result_${suite_id}_${pid}_${random}"
+    
+    # Create result file
+    echo "test_status=passed" > "$result_file"
+    TEST_RESULT_FILES+=("$result_file")
+    
+    # Simulate the find command from poll_test_results()
+    local result_files
+    result_files=$(find /tmp -name "suitey_test_result_*" -type f 2>/dev/null || true)
+    
+    # Simulate the while loop processing
+    local found_count=0
+    while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+        if [[ "$file" == "$result_file" ]]; then
+            found_count=$((found_count + 1))
+        fi
+    done <<< "$result_files"
+    
+    # Should have found the file
+    assert [ $found_count -eq 1 ]
+}
+
+@test "poll_test_results() handles find output with multiple files correctly" {
+    # Test that the while loop processes multiple files correctly
+    local suite_id1="test-suite-1"
+    local suite_id2="test-suite-2"
+    local pid=$$
+    local random1=$RANDOM
+    local random2=$RANDOM
+    local result_file1="/tmp/suitey_test_result_${suite_id1}_${pid}_${random1}"
+    local result_file2="/tmp/suitey_test_result_${suite_id2}_${pid}_${random2}"
+    
+    # Create result files
+    echo "test_status=passed" > "$result_file1"
+    echo "test_status=passed" > "$result_file2"
+    TEST_RESULT_FILES+=("$result_file1" "$result_file2")
+    
+    # Simulate the find command
+    local result_files
+    result_files=$(find /tmp -name "suitey_test_result_*" -type f 2>/dev/null || true)
+    
+    # Count files found
+    local found_count=0
+    while IFS= read -r file; do
+        [[ -z "$file" ]] && continue
+        if [[ "$file" == "$result_file1" ]] || [[ "$file" == "$result_file2" ]]; then
+            found_count=$((found_count + 1))
+        fi
+    done <<< "$result_files"
+    
+    # Should have found both files
+    assert [ $found_count -ge 2 ]
+}
+
+@test "poll_test_results() file creation is immediately visible to find command" {
+    local suite_id="visibility-test"
+    local pid=$$
+    local random=$RANDOM
+    local result_file="/tmp/suitey_test_result_${suite_id}_${pid}_${random}"
+    
+    # Create file
+    echo "test_status=passed" > "$result_file"
+    TEST_RESULT_FILES+=("$result_file")
+    
+    # Immediately verify file exists
+    assert [ -f "$result_file" ]
+    
+    # Verify find can see it immediately
+    local found
+    found=$(find /tmp -name "suitey_test_result_${suite_id}_*" -type f 2>/dev/null | wc -l)
+    assert [ "$found" -ge 1 ]
+}
+
+@test "poll_test_results() creates three files and find returns all three" {
+    local suite_ids=("find-test-a" "find-test-b" "find-test-c")
+    local pid=$$
+    local created_files=()
+    
+    # Create three files
+    for suite_id in "${suite_ids[@]}"; do
+        local random=$RANDOM
+        local result_file="/tmp/suitey_test_result_${suite_id}_${pid}_${random}"
+        echo "test_status=passed" > "$result_file"
+        created_files+=("$result_file")
+        TEST_RESULT_FILES+=("$result_file")
+    done
+    
+    # Verify all files exist
+    for file in "${created_files[@]}"; do
+        assert [ -f "$file" ]
+    done
+    
+    # Verify find returns all three
+    local found_count
+    found_count=$(find /tmp -name "suitey_test_result_find-test-*" -type f 2>/dev/null | wc -l)
+    assert [ "$found_count" -eq 3 ]
+}
+
+@test "poll_test_results() processes all files returned by find" {
+    local suite_ids=("proc-test-a" "proc-test-b" "proc-test-c")
+    local pid=$$
+    
+    # Create three files with unique content
+    for suite_id in "${suite_ids[@]}"; do
+        local random=$RANDOM
+        local result_file="/tmp/suitey_test_result_${suite_id}_${pid}_${random}"
+        echo "test_status=passed" > "$result_file"
+        TEST_RESULT_FILES+=("$result_file")
+    done
+    
+    # Reset processed files state
+    PROCESSED_RESULT_FILES=""
+    
+    # Poll for results
+    run poll_test_results
+    assert_success
+    
+    # Should find all three
+    assert_output --partial "suite_id=proc-test-a"
+    assert_output --partial "suite_id=proc-test-b"
+    assert_output --partial "suite_id=proc-test-c"
 }

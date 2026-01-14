@@ -863,3 +863,73 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out"
     assert_output --partial "status="
 }
 
+@test "collect_test_results() stdout extraction works with multiline input" {
+    local test_data="test_status=passed
+stdout=hello world
+stderr=error message"
+    
+    # Test the extraction method used in collect_test_results
+    local extracted
+    extracted=$(echo "$test_data" | grep "^stdout=" | cut -d'=' -f2-)
+    
+    assert_equal "$extracted" "hello world"
+}
+
+@test "collect_test_results() stderr extraction works with multiline input" {
+    local test_data="test_status=passed
+stdout=hello world
+stderr=error message"
+    
+    # Test the extraction method used in collect_test_results
+    local extracted
+    extracted=$(echo "$test_data" | grep "^stderr=" | cut -d'=' -f2-)
+    
+    assert_equal "$extracted" "error message"
+}
+
+@test "collect_test_results() creates result file that can be found" {
+    local suite_id="file-creation-test"
+    local test_result="test_status=passed
+exit_code=0"
+    
+    run collect_test_results "$suite_id" "$test_result"
+    assert_success
+    
+    # Verify result file was created
+    local result_files
+    result_files=$(ls /tmp/suitey_test_result_${suite_id}_* 2>/dev/null | head -1)
+    assert [ -n "$result_files" ]
+    assert [ -f "$result_files" ]
+    
+    # Clean up
+    rm -f /tmp/suitey_test_result_${suite_id}_* /tmp/suitey_test_output_${suite_id}_* 2>/dev/null || true
+}
+
+@test "collect_test_results() output file contains content when stdout provided" {
+    local suite_id="output-content-test"
+    local test_result="test_status=passed
+exit_code=0
+stdout=expected output content
+stderr=expected error content"
+    
+    run collect_test_results "$suite_id" "$test_result"
+    assert_success
+    
+    # Find the output file
+    local output_file
+    output_file=$(ls /tmp/suitey_test_output_${suite_id}_* 2>/dev/null | head -1)
+    
+    # Verify output file exists and has content
+    assert [ -n "$output_file" ]
+    assert [ -f "$output_file" ]
+    
+    local content
+    content=$(cat "$output_file" 2>/dev/null || echo "")
+    
+    # Output file should have content
+    assert [ -n "$content" ]
+    
+    # Clean up
+    rm -f /tmp/suitey_test_result_${suite_id}_* /tmp/suitey_test_output_${suite_id}_* 2>/dev/null || true
+}
+
