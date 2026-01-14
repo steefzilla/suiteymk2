@@ -1013,12 +1013,12 @@ This requirement applies to all phases and ensures code quality and test coverag
 
 **4.1.1 Output Streaming**
 *Stream raw test output to stdout/stderr with suite identification prefixes, buffering output by suite for readability.*
-- [ ] **Red**: Write test `tests/bats/unit/verbose_formatter.bats`
+- [x] **Red**: Write test `tests/bats/unit/verbose_formatter.bats`
   - Test: Stream test output with suite identification prefix
   - Test: Buffer output by suite for readability
   - Test: Output buffer every 100ms (fallback)
-- [ ] **Green**: Implement verbose formatter in `src/verbose_formatter.sh`
-- [ ] **Refactor**: Optimize buffering, improve readability
+- [x] **Green**: Implement verbose formatter in `src/verbose_formatter.sh`
+- [x] **Refactor**: Optimize buffering, improve readability
 
 **4.1.2 Post-Completion Output**
 *Output all tests in execution order after completion, displaying stack traces for failures and errors.*
