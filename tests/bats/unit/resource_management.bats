@@ -421,16 +421,17 @@ teardown() {
     echo "test2" > "/tmp/suitey_cleanup_count_${unique}_2"
     echo "test3" > "/tmp/suitey_cleanup_count_${unique}_3"
 
-    run cleanup_temp_files
+    # Use pattern parameter to only clean up THIS test's files (avoid race conditions)
+    run cleanup_temp_files "${unique}"
     assert_success
 
     # Should report files removed
     assert_output --partial "temp_files_removed="
     
-    # Extract count - should be at least 3 (our files)
+    # Extract count - should be exactly 3 (only our files matching the pattern)
     local files_removed
     files_removed=$(echo "$output" | grep "^temp_files_removed=" | cut -d'=' -f2)
-    assert [ "$files_removed" -ge 3 ]
+    assert [ "$files_removed" -eq 3 ]
 }
 
 @test "cleanup_temp_files() does not remove non-suitey files" {

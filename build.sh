@@ -298,8 +298,11 @@ include_source_files() {
             # Add a comment header for the file
             echo "# Included from: $source_file" >> "$output_file"
 
-            # Include the file content
-            cat "$source_file" >> "$output_file"
+            # Include the file content, replacing source statements for src/ files with no-ops
+            # since those files are already bundled into this script.
+            # This prevents duplicate declarations when running from the source directory.
+            # We replace with ':' (no-op) instead of deleting to preserve if/then/fi structure.
+            sed 's/^\([[:space:]]*\)source "src\/[^"]*".*$/\1: # source already bundled/; s/^\([[:space:]]*\)source '\''src\/[^'\'']*'\''.*$/\1: # source already bundled/' "$source_file" >> "$output_file"
 
             # Add separator
             echo >> "$output_file"
@@ -637,7 +640,10 @@ validate_bundle() {
     fi
 
     # Basic syntax check
-    if ! bash -n "$bundle_file" 2>/dev/null; then
+    local syntax_errors
+    if ! syntax_errors=$(bash -n "$bundle_file" 2>&1); then
+        echo "Syntax check errors:" >&2
+        echo "$syntax_errors" >&2
         error "Bundle file has syntax errors: $bundle_file"
     fi
 
